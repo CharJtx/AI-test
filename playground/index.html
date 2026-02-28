@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Interactive Player</title>
+  <link rel="stylesheet" href="player.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* ── Scene selector (shown when no ?scene= param) ── */
+    .scene-selector {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh; padding: 2em; color: #ccc;
+    }
+    .scene-selector h1 {
+      font-size: 1.4em; font-weight: 400; letter-spacing: 2px;
+      margin-bottom: 1.5em; color: #888;
+    }
+    .scene-list {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;
+    }
+    .scene-card {
+      background: #181818; border: 1px solid #2a2a2a; border-radius: 8px;
+      padding: 1.2em 2em; cursor: pointer; transition: all 0.2s;
+      text-decoration: none; color: #ddd; min-width: 160px; text-align: center;
+    }
+    .scene-card:hover {
+      background: #222; border-color: #444; color: #fff; transform: translateY(-2px);
+    }
+    .scene-card .name { font-size: 1.1em; margin-bottom: 0.3em; }
+    .scene-card .path { font-size: 0.75em; color: #666; font-family: monospace; }
+    .editor-link {
+      margin-top: 2em; color: #555; font-size: 0.85em;
+      text-decoration: none; border: 1px solid #333; border-radius: 6px;
+      padding: 8px 20px; transition: all 0.2s;
+    }
+    .editor-link:hover { color: #aaa; border-color: #555; }
+    .scene-error {
+      color: #e74c3c; padding: 2em; font-family: monospace;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="player.js"></script>
+  <script>
+    const app = document.getElementById('app');
+    const params = new URLSearchParams(location.search);
+    const sceneName = params.get('scene');
+
+    if (sceneName) {
+      loadScene(sceneName);
+    } else {
+      showSceneSelector();
+    }
+
+    async function loadScene(name) {
+      const baseUrl = `scenes/${encodeURIComponent(name)}/`;
+      const jsonUrl = baseUrl + 'scene-data.json';
+
+      try {
+        const resp = await fetch(jsonUrl);
+        if (!resp.ok) throw new Error(`无法加载 ${jsonUrl} (${resp.status})`);
+        const data = await resp.json();
+
+        document.title = `${name} - Interactive Player`;
+        const player = new InteractivePlayer(app, data, { baseUrl });
+        player.init();
+      } catch (err) {
+        app.innerHTML = `<div class="scene-error">加载失败: ${err.message}</div>`;
+      }
+    }
+
+    async function showSceneSelector() {
+      try {
+        const resp = await fetch('/api/playground/scenes');
+        if (!resp.ok) throw new Error('无法获取场景列表');
+        const { scenes } = await resp.json();
+
+        if (scenes.length === 0) {
+          app.innerHTML = `<div class="scene-selector"><h1>暂无场景</h1><p style="color:#555">在 playground/scenes/ 下创建子目录并放入 scene-data.json</p></div>`;
+          return;
+        }
+
+        app.innerHTML = `
+          <div class="scene-selector">
+            <h1>选择场景</h1>
+            <div class="scene-list">
+              ${scenes.map(s => `
+                <a class="scene-card" href="?scene=${encodeURIComponent(s)}">
+                  <div class="name">${s}</div>
+                  <div class="path">scenes/${s}/</div>
+                </a>
+              `).join('')}
+            </div>
+            <a class="editor-link" href="editor.html">✎ 场景编辑器</a>
+          </div>
+        `;
+      } catch {
+        app.innerHTML = `<div class="scene-selector"><h1>选择场景</h1><p style="color:#555">无法获取列表，请直接使用 <code style="color:#aaa">?scene=demo</code> 访问</p></div>`;
+      }
+    }
+  </script>
+</body>
+</html>

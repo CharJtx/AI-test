@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Playground</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Model Playground</h1>
+    <div class="header-actions">
+      <button id="btn-clear" title="清空对话">清空对话</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Left panel: config -->
+    <aside class="sidebar">
+      <!-- Character Card -->
+      <section class="panel">
+        <h3>角色卡 Character</h3>
+        <div class="char-bar">
+          <select id="char-select"><option value="">-- 未选择角色 --</option></select>
+          <button id="btn-new-char" title="新建角色卡">+</button>
+          <button id="btn-import-char" title="导入角色卡 JSON">📂</button>
+          <input type="file" id="char-file-input" accept=".json" hidden>
+        </div>
+        <div id="char-info" class="char-info" hidden>
+          <div class="char-info-row">
+            <span id="char-tags" class="char-tags"></span>
+            <div class="char-info-actions">
+              <button id="btn-edit-char" title="编辑角色卡">✏️</button>
+              <button id="btn-delete-char" class="danger" title="删除角色卡">🗑️</button>
+            </div>
+          </div>
+          <button id="btn-send-greeting" class="btn-greeting">发送开场白</button>
+        </div>
+      </section>
+
+      <!-- Preset management -->
+      <section class="panel">
+        <h3>Preset 预设</h3>
+        <div class="preset-bar">
+          <select id="preset-select"><option value="">-- 选择预设 --</option></select>
+          <button id="btn-save-preset" title="保存当前配置为预设">💾</button>
+          <button id="btn-delete-preset" title="删除选中预设">🗑️</button>
+        </div>
+      </section>
+
+      <!-- System prompt -->
+      <section class="panel">
+        <h3>System Prompt</h3>
+        <textarea id="system-prompt" rows="8" placeholder="设定角色、场景、规则..."></textarea>
+        <div class="rp-format-toggle">
+          <label class="toggle-label">
+            <input type="checkbox" id="rp-format-hint" checked>
+            <span>RP 格式提示</span>
+          </label>
+          <span class="rp-format-preview">
+            <span class="rp-action-preview">*动作描写*</span>
+            <span class="rp-dialogue-preview">「对话内容」</span>
+          </span>
+        </div>
+      </section>
+
+      <!-- World Books -->
+      <section class="panel">
+        <h3>世界书 Lorebook</h3>
+        <div class="wb-toolbar">
+          <button id="btn-create-wb" title="新建世界书">+ 新建</button>
+          <button id="btn-import-wb" title="导入 JSON 文件">📂 导入</button>
+          <input type="file" id="wb-file-input" accept=".json" hidden>
+        </div>
+        <div id="wb-list" class="wb-list"></div>
+      </section>
+
+      <!-- Model selection -->
+      <section class="panel">
+        <h3>模型选择</h3>
+        <input type="text" id="model-search" placeholder="搜索模型...">
+        <div class="filter-bar">
+          <label class="toggle-label">
+            <input type="checkbox" id="filter-unmoderated">
+            <span>仅显示无审核模型</span>
+          </label>
+          <span class="model-count" id="model-count"></span>
+        </div>
+        <div id="model-list" class="model-list"></div>
+        <div class="selected-models">
+          <span class="label">已选:</span>
+          <div id="selected-tags"></div>
+        </div>
+      </section>
+
+      <!-- Parameters -->
+      <section class="panel">
+        <h3>参数调节</h3>
+        <div class="param-group">
+          <label>Temperature <span id="temp-val">0.7</span></label>
+          <input type="range" id="param-temperature" min="0" max="2" step="0.05" value="0.7">
+        </div>
+        <div class="param-group">
+          <label>Top P <span id="topp-val">1.0</span></label>
+          <input type="range" id="param-top-p" min="0" max="1" step="0.05" value="1.0">
+        </div>
+        <div class="param-group">
+          <label>Max Tokens</label>
+          <input type="number" id="param-max-tokens" value="2048" min="1" max="128000">
+        </div>
+        <div class="param-group">
+          <label>Frequency Penalty <span id="freq-val">0.0</span></label>
+          <input type="range" id="param-freq-penalty" min="0" max="2" step="0.05" value="0">
+        </div>
+        <div class="param-group">
+          <label>Presence Penalty <span id="pres-val">0.0</span></label>
+          <input type="range" id="param-pres-penalty" min="0" max="2" step="0.05" value="0">
+        </div>
+      </section>
+    </aside>
+
+    <!-- Right: chat area -->
+    <main class="chat-area">
+      <div id="chat-columns" class="chat-columns">
+        <div class="placeholder-msg">← 选择模型后开始对话</div>
+      </div>
+      <div class="input-bar">
+        <textarea id="user-input" rows="3" placeholder="输入消息... (Ctrl+Enter 发送)"></textarea>
+        <button id="btn-send">发送</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

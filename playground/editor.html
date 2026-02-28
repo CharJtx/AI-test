@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scene Editor</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <!-- ── Top Bar ── -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/playground/" class="back-link">← 返回</a>
+      <h1>场景编辑器</h1>
+    </div>
+    <div class="topbar-actions">
+      <button id="btn-save" class="btn primary" disabled>保存</button>
+      <a id="link-preview" class="btn" target="_blank" style="display:none">预览 ▶</a>
+    </div>
+  </header>
+
+  <main class="editor-layout">
+    <!-- ── Left: Scene + Config ── -->
+    <aside class="sidebar">
+      <section class="card">
+        <h2>场景</h2>
+        <div class="field-row">
+          <select id="scene-select"><option value="">-- 选择场景 --</option></select>
+          <button id="btn-new-scene" class="btn small">新建</button>
+        </div>
+      </section>
+
+      <section class="card" id="sec-grid">
+        <h2>网格配置</h2>
+        <div class="field-row">
+          <label>列 <input type="number" id="grid-cols" min="1" max="20" value="5" class="num-input"></label>
+          <label>行 <input type="number" id="grid-rows" min="1" max="20" value="2" class="num-input"></label>
+        </div>
+      </section>
+
+      <section class="card" id="sec-resources">
+        <h2>素材 <span id="res-count" class="badge">0</span></h2>
+        <div id="upload-zone" class="upload-zone">
+          <input type="file" id="file-input" multiple accept="video/*" hidden>
+          <div class="upload-hint">拖拽视频文件到此处<br>或 <button id="btn-browse" class="link-btn">点击选择</button></div>
+        </div>
+        <div id="resource-list" class="resource-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>初始状态</h2>
+        <select id="initial-state"><option value="">-- 请先添加状态 --</option></select>
+      </section>
+    </aside>
+
+    <!-- ── Center: States ── -->
+    <div class="main-content">
+      <div class="section-header">
+        <h2>状态列表</h2>
+        <button id="btn-add-state" class="btn small">+ 添加状态</button>
+      </div>
+      <div id="state-list" class="state-list">
+        <div class="empty-hint">选择或创建场景后开始编辑</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Toast ── -->
+  <div id="toast" class="toast"></div>
+
+  <script src="editor.js"></script>
+</body>
+</html>

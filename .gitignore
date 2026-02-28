@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Environment
+.env
+
+# Video assets (too large for GitHub)
+playground/scenes/**/*.mp4
+playground/scenes/**/*.webm
+playground/scenes/**/*.mov
+playground/scenes/**/*.avi
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,87 @@
+{
+  "config": {
+    "grid": { "cols": 5, "rows": 2 }
+  },
+  "resources": {
+    "state1": "状态1.mp4",
+    "state2": "状态2.mp4",
+    "state3": "状态3.mp4",
+    "state4": "状态4.mp4",
+    "state5": "状态5.mp4",
+    "state6": "状态6.mp4",
+    "state7": "状态7.mp4",
+    "state8": "状态8.mp4",
+    "transition1": "过渡1.mp4",
+    "transition2": "过渡2.mp4",
+    "transition3": "过渡3.mp4"
+  },
+  "states": {
+    "state1": {
+      "video": "state1",
+      "loop": false,
+      "next": "state2"
+    },
+    "state2": {
+      "video": "state2",
+      "loop": true,
+      "on_click": [
+        { "regions": { "rows": [1], "cols": [0,1,2,3,4] }, "target": "state3" },
+        { "regions": { "rows": [0], "cols": [0,1,2,3,4] }, "target": "transition1" }
+      ]
+    },
+    "state3": {
+      "video": "state3",
+      "loop": false,
+      "next": "state2"
+    },
+    "transition1": {
+      "video": "transition1",
+      "loop": false,
+      "next": "state4"
+    },
+    "state4": {
+      "video": "state4",
+      "loop": true,
+      "on_click": [
+        { "regions": { "rows": [0,1], "cols": [0,1,2] }, "target": "state6" },
+        { "regions": { "rows": [0,1], "cols": [3,4] }, "target": "transition2" }
+      ]
+    },
+    "state6": {
+      "video": "state6",
+      "loop": false,
+      "next": "state2"
+    },
+    "transition2": {
+      "video": "transition2",
+      "loop": false,
+      "next": "state5"
+    },
+    "state5": {
+      "video": "state5",
+      "loop": true,
+      "on_click": [
+        { "regions": { "rows": [1], "cols": [2] }, "target": "transition3" }
+      ]
+    },
+    "transition3": {
+      "video": "transition3",
+      "loop": false,
+      "next": "state7"
+    },
+    "state7": {
+      "video": "state7",
+      "loop": true,
+      "on_click": [
+        { "regions": { "rows": [1], "cols": [2] }, "target": "state8" },
+        { "regions": "*", "target": "state2" }
+      ]
+    },
+    "state8": {
+      "video": "state8",
+      "loop": false,
+      "next": "state7"
+    }
+  },
+  "initialState": "state1"
+}

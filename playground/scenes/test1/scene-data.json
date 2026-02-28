@@ -1,0 +1,55 @@
+{
+  "config": {
+    "grid": {
+      "cols": 5,
+      "rows": 2
+    }
+  },
+  "resources": {
+    "20260228-150730": "20260228-150730.mp4",
+    "20260228-151313": "20260228-151313.mp4",
+    "20260228-153135": "20260228-153135.mp4"
+  },
+  "states": {
+    "state1": {
+      "video": "20260228-150730",
+      "loop": true,
+      "next": null,
+      "on_click": [
+        {
+          "regions": {
+            "rows": [
+              1
+            ],
+            "cols": [
+              2,
+              3
+            ]
+          },
+          "target": "state2"
+        }
+      ]
+    },
+    "state2": {
+      "video": "20260228-150730",
+      "loop": true,
+      "next": null,
+      "on_click": [
+        {
+          "regions": {
+            "rows": [
+              0,
+              1
+            ],
+            "cols": [
+              1,
+              2
+            ]
+          },
+          "target": ""
+        }
+      ]
+    }
+  },
+  "initialState": "state1"
+}
