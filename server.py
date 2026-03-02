@@ -362,9 +362,10 @@ Rules:
 2. Write the prompt in ENGLISH regardless of the input language.
 3. Focus on: character appearance (hair, eyes, body, clothing, expression), pose/action, setting/background, lighting, mood/atmosphere.
 4. Use comma-separated descriptive tags and short phrases, like image generation prompts typically look.
-5. Include quality boosters at the end: "masterpiece, best quality, highly detailed"
-6. If the scene is intimate/erotic, describe it artistically using body positioning, expressions, and atmosphere rather than crude terms.
-7. Keep the prompt between 50-150 words."""
+5. The prompt MUST be styled as realistic photography. Always include these realism tags: "photorealistic, realistic photograph, real environment, cinematic composition, professional lighting, sharp background with rich details, clear translucent skin texture, natural skin pores, shot on Canon EOS R5, 85mm lens, shallow depth of field"
+6. Include quality boosters at the end: "masterpiece, best quality, highly detailed, 8k uhd, RAW photo"
+7. If the scene is intimate/erotic, describe it artistically using body positioning, expressions, and atmosphere rather than crude terms.
+8. Keep the prompt between 80-200 words."""
 
 
 @app.post("/api/image-prompt")
