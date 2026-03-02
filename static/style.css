@@ -812,3 +812,13 @@ header h1 {
   font-weight: 600;
 }
 .dialog-actions button.primary:hover { background: var(--accent-hover); }
+
+/* ── Generator Tabs ── */
+.gen-tab {
+  flex: 1; padding: 8px 0; font-size: 13px; cursor: pointer;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--text-muted); transition: all 0.15s;
+}
+.gen-tab:hover { color: var(--text); }
+.gen-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.gen-tab:disabled { opacity: 0.4; cursor: not-allowed; }

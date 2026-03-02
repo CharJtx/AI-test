@@ -60,6 +60,7 @@ const $wbFileInput = document.getElementById("wb-file-input");
 
 const $charSelect = document.getElementById("char-select");
 const $btnNewChar = document.getElementById("btn-new-char");
+const $btnGenChar = document.getElementById("btn-gen-char");  // may be null on cached HTML
 const $btnImportChar = document.getElementById("btn-import-char");
 const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
@@ -82,6 +83,7 @@ function setupEvents() {
 
   $charSelect.addEventListener("change", onCharSelect);
   $btnNewChar.addEventListener("click", () => openCharEditor(null));
+  $btnGenChar?.addEventListener("click", openCharGenerator);
   $btnImportChar.addEventListener("click", () => $charFileInput.click());
   $charFileInput.addEventListener("change", importCharacter);
   $btnEditChar.addEventListener("click", () => {
@@ -893,6 +895,183 @@ async function deleteCharacter() {
   state.activeCharId = null;
   renderCharSelect();
   renderCharInfo();
+}
+
+function openCharGenerator() {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:560px">
+      <h3>✨ AI 生成角色卡</h3>
+      <div class="gen-tabs" style="display:flex;gap:0;margin-top:8px;border-bottom:1px solid var(--border)">
+        <button class="gen-tab active" data-tab="text">📝 关键词生成</button>
+        <button class="gen-tab" data-tab="image">🖼️ 图片生成</button>
+      </div>
+
+      <div id="gen-panel-text" class="gen-panel">
+        <div class="char-field" style="margin-top:10px">
+          <label>关键词 / 角色概念描述</label>
+          <textarea id="gen-keywords" rows="6" placeholder="输入关键词或角色概念，例如：&#10;&#10;冷酷女杀手，双面人格，白天是温柔的花店老板，晚上是地下组织的王牌&#10;&#10;或者直接粘贴一段详细的角色描述"></textarea>
+          <div class="hint">描述越详细，生成的角色卡越精准。支持中文/英文。</div>
+        </div>
+      </div>
+
+      <div id="gen-panel-image" class="gen-panel" style="display:none">
+        <div class="char-field" style="margin-top:10px">
+          <label>角色图片</label>
+          <div id="gen-img-zone" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;min-height:120px;display:flex;align-items:center;justify-content:center">
+            <input type="file" id="gen-img-input" accept="image/*" hidden>
+            <div id="gen-img-hint">拖拽图片到此处，或点击选择<br><span style="font-size:11px;color:var(--text-muted)">支持 JPG / PNG / WebP</span></div>
+            <img id="gen-img-preview" style="display:none;max-height:200px;max-width:100%;border-radius:6px">
+          </div>
+        </div>
+        <div class="char-field">
+          <label>补充设定（可选）</label>
+          <textarea id="gen-extra" rows="3" placeholder="可选：补充角色身份、性格、背景等设定，AI 会结合图片和文字一起生成"></textarea>
+        </div>
+      </div>
+
+      <div class="char-field" style="margin-top:8px">
+        <label>生成模型</label>
+        <select id="gen-model">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+      <div id="gen-status" style="display:none;margin-top:8px;padding:10px;border-radius:6px;background:var(--bg-card);font-size:12px;color:var(--text-muted);white-space:pre-wrap"></div>
+      <div class="dialog-actions" style="margin-top:12px">
+        <button id="gen-cancel">取消</button>
+        <button id="gen-submit" class="primary">开始生成</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const $model = document.getElementById("gen-model");
+  const $status = document.getElementById("gen-status");
+  const $submit = document.getElementById("gen-submit");
+  const $imgZone = document.getElementById("gen-img-zone");
+  const $imgInput = document.getElementById("gen-img-input");
+  const $imgPreview = document.getElementById("gen-img-preview");
+  const $imgHint = document.getElementById("gen-img-hint");
+
+  let currentTab = "text";
+  let selectedFile = null;
+
+  // ── Tab switching ──
+  overlay.querySelectorAll(".gen-tab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      overlay.querySelectorAll(".gen-tab").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTab = btn.dataset.tab;
+      document.getElementById("gen-panel-text").style.display = currentTab === "text" ? "" : "none";
+      document.getElementById("gen-panel-image").style.display = currentTab === "image" ? "" : "none";
+      populateModels();
+    });
+  });
+
+  // ── Image upload ──
+  $imgZone.addEventListener("click", () => $imgInput.click());
+  $imgZone.addEventListener("dragover", e => { e.preventDefault(); $imgZone.style.borderColor = "var(--primary)"; });
+  $imgZone.addEventListener("dragleave", () => { $imgZone.style.borderColor = ""; });
+  $imgZone.addEventListener("drop", e => {
+    e.preventDefault();
+    $imgZone.style.borderColor = "";
+    if (e.dataTransfer.files[0]) setImage(e.dataTransfer.files[0]);
+  });
+  $imgInput.addEventListener("change", () => { if ($imgInput.files[0]) setImage($imgInput.files[0]); });
+
+  function setImage(file) {
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    $imgPreview.src = url;
+    $imgPreview.style.display = "";
+    $imgHint.style.display = "none";
+  }
+
+  // ── Model population ──
+  const GEN_PREFERRED = ["grok-4", "grok-3", "claude", "gemini", "deepseek"];
+  function populateModels() {
+    const isVision = currentTab === "image";
+    const genModels = state.models
+      .filter(m => {
+        if (m.is_moderated) return false;
+        if (m.max_completion_tokens !== null && m.max_completion_tokens < 8000) return false;
+        if (isVision) {
+          const modality = m.architecture?.modality || "";
+          return modality.includes("image");
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aP = GEN_PREFERRED.findIndex(p => a.id.toLowerCase().includes(p));
+        const bP = GEN_PREFERRED.findIndex(p => b.id.toLowerCase().includes(p));
+        return (aP >= 0 ? aP : 999) - (bP >= 0 ? bP : 999) || a.name.localeCompare(b.name);
+      });
+    $model.innerHTML = genModels.map(m =>
+      `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`
+    ).join('');
+  }
+  populateModels();
+
+  document.getElementById("gen-cancel").addEventListener("click", () => overlay.remove());
+
+  $submit.addEventListener("click", async () => {
+    if (currentTab === "text") {
+      const keywords = document.getElementById("gen-keywords").value.trim();
+      if (!keywords) { alert("请输入关键词"); return; }
+      await doGenerate({ keywords, model: $model.value });
+    } else {
+      if (!selectedFile) { alert("请上传一张图片"); return; }
+      const form = new FormData();
+      form.append("image", selectedFile);
+      form.append("extra", document.getElementById("gen-extra").value);
+      form.append("model", $model.value);
+      await doGenerate(form);
+    }
+  });
+
+  async function doGenerate(payload) {
+    $submit.disabled = true;
+    $submit.textContent = "生成中...";
+    $status.style.display = "block";
+    $status.style.color = "";
+    $status.textContent = currentTab === "image"
+      ? "正在分析图片并生成完整角色卡（含 character_book），大约需要 30-120 秒..."
+      : "正在调用 AI 生成完整角色卡（含 character_book），大约需要 30-90 秒...";
+
+    try {
+      const isForm = payload instanceof FormData;
+      const url = isForm ? "/api/characters/generate-from-image" : "/api/characters/generate";
+      const opts = isForm
+        ? { method: "POST", body: payload }
+        : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) };
+      const resp = await fetch(url, opts);
+      const data = await resp.json();
+
+      if (data.error) {
+        $status.style.color = "var(--accent)";
+        $status.textContent = "生成失败: " + data.error;
+        if (data.raw) $status.textContent += "\n\n原始输出片段:\n" + data.raw;
+        $submit.disabled = false;
+        $submit.textContent = "重试";
+        return;
+      }
+
+      state.characters.push(data.character);
+      state.activeCharId = data.character.id;
+      renderCharSelect();
+      $charSelect.value = data.character.id;
+      renderCharInfo();
+      overlay.remove();
+
+      const bookEntries = data.character.character_book?.entries?.length || 0;
+      alert(`角色「${data.character.name}」生成成功！\n包含 ${bookEntries} 条 Character Book 条目。`);
+    } catch (e) {
+      $status.style.color = "var(--accent)";
+      $status.textContent = "请求失败: " + e.message;
+      $submit.disabled = false;
+      $submit.textContent = "重试";
+    }
+  }
 }
 
 function openCharEditor(existingChar) {
