@@ -231,6 +231,8 @@ class InteractivePlayer {
 
   _matchRegion(regions, row, col) {
     if (regions === '*') return true;
+    if (Array.isArray(regions))
+      return regions.some(([r, c]) => r === row && c === col);
     return regions.rows.includes(row) && regions.cols.includes(col);
   }
 

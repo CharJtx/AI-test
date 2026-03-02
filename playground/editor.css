@@ -163,9 +163,11 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .region-cell {
   height: 24px; border-radius: 3px;
   background: #1c1c1f; border: 1px solid #27272a;
-  transition: all 0.1s;
+  cursor: pointer; transition: all 0.1s;
 }
+.region-cell:hover { border-color: #3b82f6; }
 .region-cell.selected { background: #1e3a5f; border-color: #3b82f6; }
+.region-cell.selected:hover { background: #1e40af; }
 
 /* ── Toast ── */
 .toast {

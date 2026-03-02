@@ -103,6 +103,9 @@ async function selectScene(name) {
   if (dataRes && dataRes.config) {
     sceneData = dataRes;
     stateOrder = Object.keys(sceneData.states);
+    for (const s of Object.values(sceneData.states)) {
+      if (s.on_click) s.on_click.forEach(a => { a.regions = normRegions(a.regions); });
+    }
   } else {
     sceneData = { config: { grid: { cols: 5, rows: 2 } }, resources: {}, states: {}, initialState: '' };
     stateOrder = [];
@@ -310,14 +313,24 @@ function stateOptions(selected) {
 }
 
 // ── Click Actions ────────────────────────────────────────
+
+function normRegions(regions) {
+  if (regions === '*') return '*';
+  if (Array.isArray(regions)) return regions;
+  const cells = [];
+  for (const r of (regions.rows || [])) for (const c of (regions.cols || [])) cells.push([r, c]);
+  return cells;
+}
+
+function cellKey(r, c) { return r + ',' + c; }
+
 function addAction(stateId) {
   const s = sceneData.states[stateId];
   if (!s.on_click) s.on_click = [];
   const { cols, rows } = sceneData.config.grid;
-  s.on_click.push({
-    regions: { rows: Array.from({ length: rows }, (_, i) => i), cols: Array.from({ length: cols }, (_, i) => i) },
-    target: '',
-  });
+  const allCells = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push([r, c]);
+  s.on_click.push({ regions: allCells, target: '' });
   markDirty();
   renderStates();
 }
@@ -334,7 +347,24 @@ function setActionWildcard(stateId, idx, isWild) {
     action.regions = '*';
   } else {
     const { cols, rows } = sceneData.config.grid;
-    action.regions = { rows: Array.from({ length: rows }, (_, i) => i), cols: Array.from({ length: cols }, (_, i) => i) };
+    const allCells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push([r, c]);
+    action.regions = allCells;
+  }
+  markDirty();
+  renderStates();
+}
+
+function toggleRegionCell(stateId, idx, r, c) {
+  const action = sceneData.states[stateId].on_click[idx];
+  if (action.regions === '*') return;
+  const key = cellKey(r, c);
+  const exists = action.regions.findIndex(([cr, cc]) => cr === r && cc === c);
+  if (exists >= 0) {
+    action.regions.splice(exists, 1);
+  } else {
+    action.regions.push([r, c]);
+    action.regions.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   }
   markDirty();
   renderStates();
@@ -343,9 +373,15 @@ function setActionWildcard(stateId, idx, isWild) {
 function toggleRegionRow(stateId, idx, r) {
   const action = sceneData.states[stateId].on_click[idx];
   if (action.regions === '*') return;
-  const rowSet = new Set(action.regions.rows);
-  if (rowSet.has(r)) rowSet.delete(r); else rowSet.add(r);
-  action.regions.rows = [...rowSet].sort((a, b) => a - b);
+  const { cols } = sceneData.config.grid;
+  const set = new Set(action.regions.map(([cr, cc]) => cellKey(cr, cc)));
+  const allInRow = Array.from({ length: cols }, (_, c) => c).every(c => set.has(cellKey(r, c)));
+  if (allInRow) {
+    for (let c = 0; c < cols; c++) set.delete(cellKey(r, c));
+  } else {
+    for (let c = 0; c < cols; c++) set.add(cellKey(r, c));
+  }
+  action.regions = [...set].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   markDirty();
   renderStates();
 }
@@ -353,9 +389,15 @@ function toggleRegionRow(stateId, idx, r) {
 function toggleRegionCol(stateId, idx, c) {
   const action = sceneData.states[stateId].on_click[idx];
   if (action.regions === '*') return;
-  const colSet = new Set(action.regions.cols);
-  if (colSet.has(c)) colSet.delete(c); else colSet.add(c);
-  action.regions.cols = [...colSet].sort((a, b) => a - b);
+  const { rows } = sceneData.config.grid;
+  const set = new Set(action.regions.map(([cr, cc]) => cellKey(cr, cc)));
+  const allInCol = Array.from({ length: rows }, (_, r) => r).every(r => set.has(cellKey(r, c)));
+  if (allInCol) {
+    for (let r = 0; r < rows; r++) set.delete(cellKey(r, c));
+  } else {
+    for (let r = 0; r < rows; r++) set.add(cellKey(r, c));
+  }
+  action.regions = [...set].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   markDirty();
   renderStates();
 }
@@ -373,24 +415,23 @@ function renderActions(stateId, actions) {
     const isWild = a.regions === '*';
     let gridHtml = '';
     if (!isWild) {
-      const rowSet = new Set(a.regions.rows);
-      const colSet = new Set(a.regions.cols);
+      const selSet = new Set(a.regions.map(([r, c]) => cellKey(r, c)));
 
-      // Column headers
+      // Column headers (click to toggle entire column)
       let colHeaders = '<div class="region-corner"></div>';
       for (let c = 0; c < cols; c++) {
-        const sel = colSet.has(c) ? ' selected' : '';
-        colHeaders += `<div class="region-col-hdr${sel}" onclick="toggleRegionCol('${esc(stateId)}',${idx},${c})">C${c}</div>`;
+        const allSel = Array.from({ length: rows }, (_, r) => r).every(r => selSet.has(cellKey(r, c)));
+        colHeaders += `<div class="region-col-hdr${allSel ? ' selected' : ''}" onclick="toggleRegionCol('${esc(stateId)}',${idx},${c})">C${c}</div>`;
       }
 
-      // Rows with row header + cells
+      // Row headers + individual cells
       let rowsHtml = '';
       for (let r = 0; r < rows; r++) {
-        const rSel = rowSet.has(r) ? ' selected' : '';
-        rowsHtml += `<div class="region-row-hdr${rSel}" onclick="toggleRegionRow('${esc(stateId)}',${idx},${r})">R${r}</div>`;
+        const allSel = Array.from({ length: cols }, (_, c) => c).every(c => selSet.has(cellKey(r, c)));
+        rowsHtml += `<div class="region-row-hdr${allSel ? ' selected' : ''}" onclick="toggleRegionRow('${esc(stateId)}',${idx},${r})">R${r}</div>`;
         for (let c = 0; c < cols; c++) {
-          const active = rowSet.has(r) && colSet.has(c) ? ' selected' : '';
-          rowsHtml += `<div class="region-cell${active}"></div>`;
+          const sel = selSet.has(cellKey(r, c)) ? ' selected' : '';
+          rowsHtml += `<div class="region-cell${sel}" onclick="toggleRegionCell('${esc(stateId)}',${idx},${r},${c})"></div>`;
         }
       }
 
