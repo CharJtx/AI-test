@@ -8,9 +8,11 @@ const state = {
   characters: [],
   activeCharId: null,  // currently loaded character card id
   streaming: false,
+  userName: localStorage.getItem("userName") || "用户",
 };
 
 // ── DOM refs ────────────────────────────────────────────
+const $userName = document.getElementById("user-name");
 const $systemPrompt = document.getElementById("system-prompt");
 const $modelSearch = document.getElementById("model-search");
 const $modelList = document.getElementById("model-list");
@@ -80,6 +82,12 @@ function setupEvents() {
   $btnCreateWb.addEventListener("click", () => openWbEditor(null));
   $btnImportWb.addEventListener("click", () => $wbFileInput.click());
   $wbFileInput.addEventListener("change", importWorldbook);
+
+  $userName.value = state.userName;
+  $userName.addEventListener("input", () => {
+    state.userName = $userName.value.trim() || "用户";
+    localStorage.setItem("userName", state.userName);
+  });
 
   $charSelect.addEventListener("change", onCharSelect);
   $btnNewChar.addEventListener("click", () => openCharEditor(null));
@@ -235,15 +243,77 @@ function renderMessages(modelId) {
 
   const msgs = state.conversations[modelId] || [];
   container.innerHTML = msgs
-    .map((m) => {
+    .map((m, idx) => {
       const html = m.role === "assistant" ? renderMarkdown(m.content) : escapeHtml(m.content);
+      const actions = (m.role === "assistant" && !m._streaming)
+        ? `<div class="msg-actions"><button class="msg-action-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button></div>`
+        : "";
       return `<div class="message ${m.role}"><div class="content">${html}</div>${
         m._streaming ? '<span class="streaming-cursor"></span>' : ""
-      }</div>`;
+      }${actions}</div>`;
     })
     .join("");
 
+  container.querySelectorAll(".msg-action-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mid = btn.dataset.model;
+      const i = parseInt(btn.dataset.idx);
+      const text = state.conversations[mid]?.[i]?.content;
+      if (text) generateImagePrompt(text, btn);
+    });
+  });
+
   container.scrollTop = container.scrollHeight;
+}
+
+async function generateImagePrompt(text, triggerBtn) {
+  if (triggerBtn.disabled) return;
+  triggerBtn.disabled = true;
+  triggerBtn.textContent = "⏳";
+
+  try {
+    const resp = await fetch("/api/image-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, model: state.selectedModels[0] || "x-ai/grok-4.1-fast" }),
+    });
+    const data = await resp.json();
+    if (data.error) { alert("生成失败: " + data.error); return; }
+    showImagePromptPopup(data.prompt, triggerBtn);
+  } catch (e) {
+    alert("请求失败: " + e.message);
+  } finally {
+    triggerBtn.disabled = false;
+    triggerBtn.textContent = "🎨";
+  }
+}
+
+function showImagePromptPopup(prompt, anchor) {
+  document.querySelectorAll(".img-prompt-popup").forEach(el => el.remove());
+
+  const popup = document.createElement("div");
+  popup.className = "img-prompt-popup";
+  popup.innerHTML = `
+    <div class="img-prompt-header">
+      <span>🎨 Image Prompt</span>
+      <button class="img-prompt-close">×</button>
+    </div>
+    <div class="img-prompt-text">${escapeHtml(prompt)}</div>
+    <div class="img-prompt-footer">
+      <button class="img-prompt-copy">复制</button>
+    </div>`;
+
+  const msgEl = anchor.closest(".message");
+  msgEl.appendChild(popup);
+
+  popup.querySelector(".img-prompt-close").addEventListener("click", () => popup.remove());
+  popup.querySelector(".img-prompt-copy").addEventListener("click", () => {
+    navigator.clipboard.writeText(prompt).then(() => {
+      const btn = popup.querySelector(".img-prompt-copy");
+      btn.textContent = "已复制 ✓";
+      setTimeout(() => btn.textContent = "复制", 1500);
+    });
+  });
 }
 
 function renderRpContent(text) {
@@ -335,7 +405,7 @@ function getActiveChar() {
 
 function replacePlaceholders(text, charName) {
   if (!text) return text;
-  return text.replace(/\{\{char\}\}/gi, charName || "角色").replace(/\{\{user\}\}/gi, "用户");
+  return text.replace(/\{\{char\}\}/gi, charName || "角色").replace(/\{\{user\}\}/gi, state.userName || "用户");
 }
 
 function buildCharSystemPrompt(char) {

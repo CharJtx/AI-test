@@ -148,6 +148,12 @@ Requirements:
 4. Use {{char}} for the character's name and {{user}} for the user in all text fields.
 5. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
 6. Write ALL content in the SAME language as the user's keywords input.
+7. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
+   - Set the atmosphere through environmental details (time, place, sensory details like sounds, smells, lighting)
+   - Reveal the character's identity and traits INDIRECTLY through their actions, body language, mannerisms, and dialogue style — never by stating "I am X, I do Y"
+   - Naturally imply the relationship with {{user}} through the character's attitude, tone, and how they address {{user}}
+   - Include a mix of *action/description* and spoken dialogue
+   - Feel like the opening scene of a story, drawing the reader into a specific moment
 
 Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
@@ -264,6 +270,12 @@ Requirements:
 6. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
 7. If the user provides supplementary notes, incorporate them into the character design.
 8. Write ALL content in the SAME language as any user-provided text (default to Chinese if no text given).
+9. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
+   - Set the atmosphere through environmental details (time, place, sensory details like sounds, smells, lighting)
+   - Reveal the character's identity and traits INDIRECTLY through their actions, body language, mannerisms, and dialogue style — never by stating "I am X, I do Y"
+   - Naturally imply the relationship with {{user}} through the character's attitude, tone, and how they address {{user}}
+   - Include a mix of *action/description* and spoken dialogue
+   - Feel like the opening scene of a story, drawing the reader into a specific moment
 
 Return ONLY valid JSON with the same structure as a standard character card (name, description, personality, scenario, first_mes, mes_example, system_prompt, creator_notes, tags, character_book with entries)."""
 
@@ -337,6 +349,65 @@ async def generate_character_from_image(
     chars.append(char_data)
     save_characters(chars)
     return {"character": char_data}
+
+
+# ── Image Prompt Generation ─────────────────────────────────
+
+IMG_PROMPT_SYSTEM = """You are an expert at converting roleplay narrative text into image generation prompts.
+
+Given a passage of roleplay text, extract the visual scene and produce a prompt suitable for AI image generators (Stable Diffusion, DALL-E, Midjourney, etc.).
+
+Rules:
+1. Output ONLY the prompt text, nothing else — no explanations, no labels, no markdown.
+2. Write the prompt in ENGLISH regardless of the input language.
+3. Focus on: character appearance (hair, eyes, body, clothing, expression), pose/action, setting/background, lighting, mood/atmosphere.
+4. Use comma-separated descriptive tags and short phrases, like image generation prompts typically look.
+5. Include quality boosters at the end: "masterpiece, best quality, highly detailed"
+6. If the scene is intimate/erotic, describe it artistically using body positioning, expressions, and atmosphere rather than crude terms.
+7. Keep the prompt between 50-150 words."""
+
+
+@app.post("/api/image-prompt")
+async def generate_image_prompt(request: Request):
+    body = await request.json()
+    text = body.get("text", "")
+    model = body.get("model", "x-ai/grok-4.1-fast")
+
+    if not text.strip():
+        return JSONResponse({"error": "text is required"}, status_code=400)
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": IMG_PROMPT_SYSTEM},
+                    {"role": "user", "content": text},
+                ],
+                "temperature": 0.7,
+                "max_tokens": 500,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        detail = ""
+        try:
+            detail = resp.json().get("error", {}).get("message", resp.text[:300])
+        except Exception:
+            detail = resp.text[:300]
+        return JSONResponse(
+            {"error": f"LLM API error ({resp.status_code}): {detail}"},
+            status_code=502,
+        )
+
+    data = resp.json()
+    prompt = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+    return {"prompt": prompt}
 
 
 # ── Chat completion (streaming) ─────────────────────────────
