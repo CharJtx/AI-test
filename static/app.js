@@ -598,14 +598,26 @@ Use the following formatting in your responses:
 - Write dialogue in quotation marks: 「like this」 or "like this"
 - Do not use any other formatting or markdown.`;
 
+const DIALOGUE_ONLY_INSTRUCTION = `[Response Format]
+Output ONLY the character's spoken dialogue. Do NOT include any narration, action descriptions, internal thoughts, scene-setting, or stage directions.
+- Write dialogue directly without quotation marks or speaker labels.
+- If the character would stay silent, output a very brief reaction in words (e.g. a sigh, a hum).
+- Never use asterisks, parentheses, or any formatting to describe actions.`;
+
+function getFormatHint() {
+  const mode = document.getElementById("rp-format-mode")?.value || "none";
+  if (mode === "rp") return RP_FORMAT_INSTRUCTION;
+  if (mode === "dialogue") return DIALOGUE_ONLY_INSTRUCTION;
+  return "";
+}
+
 async function streamChat(modelId, systemPrompt, params) {
   const messages = [];
   const convMsgs = state.conversations[modelId];
   const activeChar = getActiveChar();
-  const rpFormatEnabled = document.getElementById("rp-format-hint")?.checked;
 
   const charSystem = buildCharSystemPrompt(activeChar);
-  const rpHint = rpFormatEnabled ? RP_FORMAT_INSTRUCTION : "";
+  const rpHint = getFormatHint();
   const wbContext = gatherWorldbookContext(convMsgs);
   const fullSystem = [charSystem, systemPrompt, rpHint, wbContext].filter(Boolean).join("\n\n");
 
@@ -1219,6 +1231,7 @@ function onCharSelect() {
 
 function renderCharInfo() {
   const char = getActiveChar();
+  const $avatarArea = document.getElementById("char-avatar-area");
   if (!char) {
     $charInfo.hidden = true;
     return;
@@ -1231,6 +1244,33 @@ function renderCharInfo() {
     : '<span style="color:var(--text-muted);font-size:10px;">无标签</span>';
 
   $btnSendGreeting.style.display = char.first_mes ? "" : "none";
+
+  if ($avatarArea) {
+    if (char.avatar && char.avatar_type === "image") {
+      $avatarArea.hidden = false;
+      $avatarArea.innerHTML = `
+        <img class="char-avatar-img" src="${char.avatar}" alt="${escapeHtml(char.name)}">`;
+    } else if (char.avatar && char.avatar_type === "prompt") {
+      $avatarArea.hidden = false;
+      $avatarArea.innerHTML = `
+        <div class="char-avatar-prompt">
+          <div class="char-avatar-prompt-header">
+            <span>🖼️ 形象 Prompt</span>
+            <button class="char-avatar-copy" title="复制">复制</button>
+          </div>
+          <div class="char-avatar-prompt-text">${escapeHtml(char.avatar)}</div>
+        </div>`;
+      $avatarArea.querySelector(".char-avatar-copy")?.addEventListener("click", (e) => {
+        navigator.clipboard.writeText(char.avatar).then(() => {
+          e.target.textContent = "已复制 ✓";
+          setTimeout(() => e.target.textContent = "复制", 1500);
+        });
+      });
+    } else {
+      $avatarArea.hidden = true;
+      $avatarArea.innerHTML = "";
+    }
+  }
 }
 
 function sendGreeting() {

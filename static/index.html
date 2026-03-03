@@ -39,6 +39,7 @@
           <input type="file" id="char-file-input" accept=".json" hidden>
         </div>
         <div id="char-info" class="char-info" hidden>
+          <div id="char-avatar-area" class="char-avatar-area" hidden></div>
           <div class="char-info-row">
             <span id="char-tags" class="char-tags"></span>
             <div class="char-info-actions">
@@ -66,14 +67,12 @@
         <h3>System Prompt</h3>
         <textarea id="system-prompt" rows="8" placeholder="设定角色、场景、规则..."></textarea>
         <div class="rp-format-toggle">
-          <label class="toggle-label">
-            <input type="checkbox" id="rp-format-hint" checked>
-            <span>RP 格式提示</span>
-          </label>
-          <span class="rp-format-preview">
-            <span class="rp-action-preview">*动作描写*</span>
-            <span class="rp-dialogue-preview">「对话内容」</span>
-          </span>
+          <label style="font-size:11px;color:var(--text-muted);white-space:nowrap">输出格式</label>
+          <select id="rp-format-mode" style="flex:1;padding:3px 6px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+            <option value="rp">RP 格式 (*动作* 「对话」)</option>
+            <option value="dialogue">纯对话（仅台词）</option>
+            <option value="none">无格式提示</option>
+          </select>
         </div>
       </section>
 

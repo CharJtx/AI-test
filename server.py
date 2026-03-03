@@ -261,6 +261,13 @@ async def generate_character(request: Request):
             status_code=422,
         )
 
+    avatar_prompt = await _generate_avatar_prompt(
+        char_data.get("description", ""), model
+    )
+    if avatar_prompt:
+        char_data["avatar"] = avatar_prompt
+        char_data["avatar_type"] = "prompt"
+
     chars = load_characters()
     char_data["id"] = _next_id(chars)
     chars.append(char_data)
@@ -378,6 +385,9 @@ async def generate_character_from_image(
             status_code=422,
         )
 
+    char_data["avatar"] = data_url
+    char_data["avatar_type"] = "image"
+
     chars = load_characters()
     char_data["id"] = _next_id(chars)
     chars.append(char_data)
@@ -399,7 +409,8 @@ async def remix_character(request: Request):
     if not original.get("name"):
         return JSONResponse({"error": "original character is required"}, status_code=400)
 
-    card_json = json.dumps(original, ensure_ascii=False, indent=2)
+    card_for_llm = {k: v for k, v in original.items() if k not in ("avatar", "avatar_type")}
+    card_json = json.dumps(card_for_llm, ensure_ascii=False, indent=2)
     user_msg = f"Original character card:\n```json\n{card_json}\n```\n\nModification instructions:\n{instructions}"
 
     async with httpx.AsyncClient(timeout=180) as client:
@@ -449,11 +460,122 @@ async def remix_character(request: Request):
             status_code=422,
         )
 
+    orig_avatar = original.get("avatar", "")
+    orig_avatar_type = original.get("avatar_type", "")
+
+    if orig_avatar_type == "image":
+        char_data["avatar"] = orig_avatar
+        char_data["avatar_type"] = "image"
+    elif orig_avatar_type == "prompt" and orig_avatar:
+        new_prompt = await _remix_avatar_prompt(orig_avatar, instructions, model)
+        char_data["avatar"] = new_prompt or orig_avatar
+        char_data["avatar_type"] = "prompt"
+    else:
+        avatar_prompt = await _generate_avatar_prompt(
+            char_data.get("description", ""), model
+        )
+        if avatar_prompt:
+            char_data["avatar"] = avatar_prompt
+            char_data["avatar_type"] = "prompt"
+
     chars = load_characters()
     char_data["id"] = _next_id(chars)
     chars.append(char_data)
     save_characters(chars)
     return {"character": char_data}
+
+
+# ── Avatar Prompt Helper ─────────────────────────────────────
+
+AVATAR_PROMPT_SYSTEM = """You are an expert at creating character portrait prompts for AI image generators.
+
+Given a character description, produce a PORTRAIT prompt suitable for Stable Diffusion / Midjourney / DALL-E.
+
+Rules:
+1. Output ONLY the prompt text, nothing else — no explanations, no labels, no markdown.
+2. Write the prompt in ENGLISH regardless of the input language.
+3. This is a CHARACTER PORTRAIT — focus on: face, upper body, hair style/color, eye color/shape, skin tone, expression, clothing/accessories, distinguishing features (tattoos, scars, piercings, etc.).
+4. Use comma-separated descriptive tags and short phrases.
+5. The prompt MUST be styled as realistic photography. Always include: "photorealistic portrait, realistic photograph, studio lighting, cinematic composition, professional photography, clear translucent skin texture, natural skin pores, shot on Canon EOS R5, 85mm lens, shallow depth of field, bokeh background"
+6. Include quality boosters: "masterpiece, best quality, highly detailed, 8k uhd, RAW photo"
+7. Keep the prompt between 60-150 words.
+8. If intimate traits are mentioned, describe them artistically focusing on expression and body language."""
+
+AVATAR_REMIX_PROMPT_SYSTEM = """You are an expert at modifying character portrait prompts for AI image generators.
+
+You will receive:
+1. An ORIGINAL portrait prompt (text-to-image prompt describing a character's appearance)
+2. Modification instructions describing what changed about the character
+
+Produce an UPDATED portrait prompt that incorporates the modifications while preserving unchanged traits.
+
+Rules:
+1. Output ONLY the updated prompt text — no explanations, no labels, no markdown.
+2. Write in ENGLISH regardless of input language.
+3. Naturally merge the changes into the existing prompt, don't just append.
+4. Keep the same photorealistic portrait style and quality tags.
+5. Keep the prompt between 60-150 words."""
+
+
+async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
+    """Generate a portrait prompt from a character description. Returns None on failure."""
+    if not description or not description.strip():
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{OPENROUTER_BASE}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": AVATAR_PROMPT_SYSTEM},
+                        {"role": "user", "content": description},
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                },
+                headers={
+                    "Authorization": f"Bearer {get_api_key()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip() or None
+    except Exception:
+        return None
+
+
+async def _remix_avatar_prompt(original_prompt: str, instructions: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
+    """Modify an existing avatar prompt based on remix instructions. Returns None on failure."""
+    if not original_prompt:
+        return None
+    try:
+        user_msg = f"Original portrait prompt:\n{original_prompt}\n\nModification instructions:\n{instructions}"
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{OPENROUTER_BASE}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": AVATAR_REMIX_PROMPT_SYSTEM},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                },
+                headers={
+                    "Authorization": f"Bearer {get_api_key()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        return data.get("choices", [{}])[0].get("message", {}).get("content", "").strip() or None
+    except Exception:
+        return None
 
 
 # ── Image Prompt Generation ─────────────────────────────────
