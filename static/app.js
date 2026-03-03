@@ -24,6 +24,8 @@ const $btnClear = document.getElementById("btn-clear");
 const $presetSelect = document.getElementById("preset-select");
 const $btnSavePreset = document.getElementById("btn-save-preset");
 const $btnDeletePreset = document.getElementById("btn-delete-preset");
+const $btnSaveChat = document.getElementById("btn-save-chat");
+const $btnLoadChat = document.getElementById("btn-load-chat");
 
 const $temperature = document.getElementById("param-temperature");
 const $topP = document.getElementById("param-top-p");
@@ -34,7 +36,7 @@ const $presPenalty = document.getElementById("param-pres-penalty");
 // ── Init ────────────────────────────────────────────────
 async function init() {
   setupSliderLabels();
-  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters()]);
+  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters(), loadTtsVoices()]);
   setupEvents();
 }
 
@@ -67,6 +69,7 @@ const $btnImportChar = document.getElementById("btn-import-char");
 const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
 const $charTags = document.getElementById("char-tags");
+const $btnRemixChar = document.getElementById("btn-remix-char");
 const $btnEditChar = document.getElementById("btn-edit-char");
 const $btnDeleteChar = document.getElementById("btn-delete-char");
 const $btnSendGreeting = document.getElementById("btn-send-greeting");
@@ -76,6 +79,8 @@ function setupEvents() {
   $filterUnmoderated.addEventListener("change", renderModelList);
   $btnSend.addEventListener("click", sendMessage);
   $btnClear.addEventListener("click", clearConversations);
+  $btnSaveChat?.addEventListener("click", saveChatDialog);
+  $btnLoadChat?.addEventListener("click", openChatHistory);
   $btnSavePreset.addEventListener("click", savePresetDialog);
   $btnDeletePreset.addEventListener("click", deletePreset);
   $presetSelect.addEventListener("change", applyPreset);
@@ -94,6 +99,10 @@ function setupEvents() {
   $btnGenChar?.addEventListener("click", openCharGenerator);
   $btnImportChar.addEventListener("click", () => $charFileInput.click());
   $charFileInput.addEventListener("change", importCharacter);
+  $btnRemixChar?.addEventListener("click", () => {
+    const c = getActiveChar();
+    if (c) openCharRemixer(c);
+  });
   $btnEditChar.addEventListener("click", () => {
     const c = getActiveChar();
     if (c) openCharEditor(c);
@@ -246,7 +255,7 @@ function renderMessages(modelId) {
     .map((m, idx) => {
       const html = m.role === "assistant" ? renderMarkdown(m.content) : escapeHtml(m.content);
       const actions = (m.role === "assistant" && !m._streaming)
-        ? `<div class="msg-actions"><button class="msg-action-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button></div>`
+        ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button></div>`
         : "";
       return `<div class="message ${m.role}"><div class="content">${html}</div>${
         m._streaming ? '<span class="streaming-cursor"></span>' : ""
@@ -254,12 +263,21 @@ function renderMessages(modelId) {
     })
     .join("");
 
-  container.querySelectorAll(".msg-action-btn").forEach(btn => {
+  container.querySelectorAll(".img-prompt-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const mid = btn.dataset.model;
       const i = parseInt(btn.dataset.idx);
       const text = state.conversations[mid]?.[i]?.content;
       if (text) generateImagePrompt(text, btn);
+    });
+  });
+
+  container.querySelectorAll(".tts-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mid = btn.dataset.model;
+      const i = parseInt(btn.dataset.idx);
+      const text = state.conversations[mid]?.[i]?.content;
+      if (text) speakText(text, btn);
     });
   });
 
@@ -314,6 +332,106 @@ function showImagePromptPopup(prompt, anchor) {
       setTimeout(() => btn.textContent = "复制", 1500);
     });
   });
+}
+
+// ── TTS ─────────────────────────────────────────────────
+let _ttsAudio = null;
+let _ttsPlayingBtn = null;
+
+async function loadTtsVoices() {
+  const $voice = document.getElementById("tts-voice");
+  if (!$voice) return;
+  try {
+    const resp = await fetch("/api/tts/voices");
+    const { voices } = await resp.json();
+    const zhVoices = voices.filter((v) => v.locale.startsWith("zh-"));
+    const enVoices = voices.filter((v) => v.locale.startsWith("en-"));
+    const jaVoices = voices.filter((v) => v.locale.startsWith("ja-"));
+    const koVoices = voices.filter((v) => v.locale.startsWith("ko-"));
+
+    function voiceOpts(list, groupLabel) {
+      if (!list.length) return "";
+      return `<optgroup label="${groupLabel}">${list
+        .map((v) => {
+          const label = `${v.name} (${v.gender === "Female" ? "♀" : "♂"})`;
+          return `<option value="${v.id}">${label}</option>`;
+        })
+        .join("")}</optgroup>`;
+    }
+
+    $voice.innerHTML =
+      voiceOpts(zhVoices, "中文") +
+      voiceOpts(enVoices, "English") +
+      voiceOpts(jaVoices, "日本語") +
+      voiceOpts(koVoices, "한국어");
+
+    const saved = localStorage.getItem("ttsVoice");
+    if (saved && voices.some((v) => v.id === saved)) $voice.value = saved;
+    $voice.addEventListener("change", () => localStorage.setItem("ttsVoice", $voice.value));
+  } catch (e) {
+    console.error("Failed to load TTS voices:", e);
+  }
+}
+
+function getTtsVoice() {
+  return document.getElementById("tts-voice")?.value || "zh-CN-XiaoxiaoNeural";
+}
+
+function getTtsRate() {
+  return document.getElementById("tts-rate")?.value || "+0%";
+}
+
+async function speakText(text, btn) {
+  if (_ttsAudio && _ttsPlayingBtn === btn) {
+    stopTts();
+    return;
+  }
+  stopTts();
+
+  btn.disabled = true;
+  btn.textContent = "⏳";
+
+  try {
+    const resp = await fetch("/api/tts/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice: getTtsVoice(), rate: getTtsRate() }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    _ttsAudio = new Audio(url);
+    _ttsPlayingBtn = btn;
+
+    btn.disabled = false;
+    btn.textContent = "⏹️";
+    btn.classList.add("tts-playing");
+
+    _ttsAudio.addEventListener("ended", () => stopTts());
+    _ttsAudio.addEventListener("error", () => stopTts());
+    _ttsAudio.play();
+  } catch (e) {
+    alert("语音合成失败: " + e.message);
+    btn.disabled = false;
+    btn.textContent = "🔊";
+  }
+}
+
+function stopTts() {
+  if (_ttsAudio) {
+    _ttsAudio.pause();
+    if (_ttsAudio.src) URL.revokeObjectURL(_ttsAudio.src);
+    _ttsAudio = null;
+  }
+  if (_ttsPlayingBtn) {
+    _ttsPlayingBtn.textContent = "🔊";
+    _ttsPlayingBtn.classList.remove("tts-playing");
+    _ttsPlayingBtn = null;
+  }
 }
 
 function renderRpContent(text) {
@@ -559,6 +677,203 @@ function clearConversations() {
     state.conversations[modelId] = [];
   }
   renderChatColumns();
+}
+
+// ── Chat History ────────────────────────────────────────
+function saveChatDialog() {
+  const hasMessages = state.selectedModels.some(
+    (m) => (state.conversations[m] || []).length > 0
+  );
+  if (!hasMessages) {
+    alert("当前没有对话内容可保存");
+    return;
+  }
+
+  const activeChar = getActiveChar();
+  const defaultName = [
+    activeChar?.name || "",
+    new Date().toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+  ]
+    .filter(Boolean)
+    .join(" - ");
+
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:420px">
+      <h3>💾 保存对话</h3>
+      <div class="char-field">
+        <label>对话名称</label>
+        <input type="text" id="chat-save-name" value="${escapeHtml(defaultName)}" style="width:100%">
+      </div>
+      <div class="dialog-actions" style="margin-top:12px">
+        <button id="chat-save-cancel">取消</button>
+        <button id="chat-save-confirm" class="primary">保存</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const $name = document.getElementById("chat-save-name");
+  $name.select();
+  document.getElementById("chat-save-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("chat-save-confirm").addEventListener("click", async () => {
+    const name = $name.value.trim() || defaultName;
+    const payload = {
+      name,
+      timestamp: new Date().toISOString(),
+      activeCharId: state.activeCharId,
+      charName: activeChar?.name || "",
+      systemPrompt: $systemPrompt.value,
+      selectedModels: [...state.selectedModels],
+      conversations: {},
+      params: getParams(),
+    };
+    for (const mid of state.selectedModels) {
+      payload.conversations[mid] = (state.conversations[mid] || []).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+    }
+    try {
+      const resp = await fetch("/api/chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error("save failed");
+      overlay.remove();
+    } catch (e) {
+      alert("保存失败: " + e.message);
+    }
+  });
+}
+
+async function openChatHistory() {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:560px;max-height:80vh;display:flex;flex-direction:column">
+      <h3>📋 聊天记录</h3>
+      <div id="chat-history-list" style="flex:1;overflow-y:auto;margin:12px 0">
+        <div style="text-align:center;color:var(--text-muted);padding:20px">加载中...</div>
+      </div>
+      <div class="dialog-actions">
+        <button id="chat-history-close">关闭</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("chat-history-close").addEventListener("click", () => overlay.remove());
+
+  try {
+    const resp = await fetch("/api/chats");
+    const data = await resp.json();
+    const list = document.getElementById("chat-history-list");
+
+    if (!data.chats || data.chats.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px">暂无保存的对话</div>';
+      return;
+    }
+
+    const sorted = data.chats.sort((a, b) => b.id - a.id);
+    list.innerHTML = sorted
+      .map((c) => {
+        const date = c.timestamp
+          ? new Date(c.timestamp).toLocaleString("zh-CN")
+          : "";
+        const models = (c.models || []).map((m) => m.split("/").pop()).join(", ");
+        return `<div class="chat-history-item" data-id="${c.id}">
+          <div class="chat-history-main">
+            <span class="chat-history-name">${escapeHtml(c.name || "未命名")}</span>
+            <span class="chat-history-meta">${escapeHtml(date)}</span>
+          </div>
+          <div class="chat-history-sub">
+            ${c.charName ? `<span class="chat-history-char">🎭 ${escapeHtml(c.charName)}</span>` : ""}
+            ${models ? `<span class="chat-history-models">🤖 ${escapeHtml(models)}</span>` : ""}
+          </div>
+          <div class="chat-history-actions">
+            <button class="chat-load-btn" data-id="${c.id}" title="加载此对话">加载</button>
+            <button class="chat-delete-btn danger" data-id="${c.id}" title="删除">🗑️</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+
+    list.querySelectorAll(".chat-load-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await loadChat(parseInt(btn.dataset.id));
+        overlay.remove();
+      });
+    });
+
+    list.querySelectorAll(".chat-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("确定删除这条聊天记录？")) return;
+        try {
+          await fetch(`/api/chats/${btn.dataset.id}`, { method: "DELETE" });
+          btn.closest(".chat-history-item").remove();
+          if (list.querySelectorAll(".chat-history-item").length === 0) {
+            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px">暂无保存的对话</div>';
+          }
+        } catch (e) {
+          alert("删除失败: " + e.message);
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById("chat-history-list").innerHTML =
+      `<div style="text-align:center;color:var(--danger);padding:20px">加载失败: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function loadChat(chatId) {
+  try {
+    const resp = await fetch(`/api/chats/${chatId}`);
+    if (!resp.ok) throw new Error("load failed");
+    const { chat } = await resp.json();
+
+    if (chat.systemPrompt != null) $systemPrompt.value = chat.systemPrompt;
+
+    if (chat.params) {
+      if (chat.params.temperature != null) {
+        $temperature.value = chat.params.temperature;
+        document.getElementById("temp-val").textContent = parseFloat(chat.params.temperature).toFixed(2);
+      }
+      if (chat.params.top_p != null) {
+        $topP.value = chat.params.top_p;
+        document.getElementById("topp-val").textContent = parseFloat(chat.params.top_p).toFixed(2);
+      }
+      if (chat.params.max_tokens != null) $maxTokens.value = chat.params.max_tokens;
+      if (chat.params.frequency_penalty != null) {
+        $freqPenalty.value = chat.params.frequency_penalty;
+        document.getElementById("freq-val").textContent = parseFloat(chat.params.frequency_penalty).toFixed(2);
+      }
+      if (chat.params.presence_penalty != null) {
+        $presPenalty.value = chat.params.presence_penalty;
+        document.getElementById("pres-val").textContent = parseFloat(chat.params.presence_penalty).toFixed(2);
+      }
+    }
+
+    if (chat.activeCharId != null) {
+      state.activeCharId = chat.activeCharId;
+      $charSelect.value = chat.activeCharId || "";
+      onCharSelect();
+    }
+
+    state.selectedModels = chat.selectedModels || [];
+    state.conversations = {};
+    for (const mid of state.selectedModels) {
+      state.conversations[mid] = (chat.conversations?.[mid] || []).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+    }
+
+    renderModelList();
+    renderSelectedTags();
+    renderChatColumns();
+  } catch (e) {
+    alert("加载对话失败: " + e.message);
+  }
 }
 
 // ── Presets ─────────────────────────────────────────────
@@ -1142,6 +1457,103 @@ function openCharGenerator() {
       $submit.textContent = "重试";
     }
   }
+}
+
+function openCharRemixer(char) {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:580px">
+      <h3>🔄 AI 改造角色卡</h3>
+      <div class="remix-card-preview">
+        <span class="remix-card-name">🎭 ${escapeHtml(char.name)}</span>
+        <span class="remix-card-tags">${(char.tags || []).map(t => `<span class="char-tag">${escapeHtml(t)}</span>`).join(" ")}</span>
+      </div>
+      <div class="char-field" style="margin-top:12px">
+        <label>改造指令</label>
+        <textarea id="remix-instructions" rows="5" placeholder="描述你想要的改造方向，例如：\n• 添加纹身女特征，全身有大面积花臂纹身\n• 把背景改到赛博朋克世界\n• 性格变得更加叛逆野性\n• 增加一段创伤记忆作为纹身的来源"></textarea>
+        <div class="hint">原卡会作为基础，AI 会将改造融入所有字段和 character_book</div>
+      </div>
+      <div class="char-field" style="margin-top:8px">
+        <label>生成模型</label>
+        <select id="remix-model"><option value="">加载中...</option></select>
+      </div>
+      <div id="remix-status" style="display:none;margin-top:8px;padding:10px;border-radius:6px;background:var(--bg-card);font-size:12px;color:var(--text-muted);white-space:pre-wrap"></div>
+      <div class="dialog-actions" style="margin-top:12px">
+        <button id="remix-cancel">取消</button>
+        <button id="remix-submit" class="primary">开始改造</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const $model = document.getElementById("remix-model");
+  const $status = document.getElementById("remix-status");
+  const $submit = document.getElementById("remix-submit");
+
+  const preferred = ["grok", "claude", "gemini", "deepseek"];
+  const suitable = state.models
+    .filter(m => !m.is_moderated && (m.context_length || 0) >= 16000)
+    .sort((a, b) => {
+      const ai = preferred.findIndex(p => a.id.toLowerCase().includes(p));
+      const bi = preferred.findIndex(p => b.id.toLowerCase().includes(p));
+      const aPref = ai >= 0 ? ai : 999;
+      const bPref = bi >= 0 ? bi : 999;
+      return aPref - bPref || a.name.localeCompare(b.name);
+    });
+  $model.innerHTML = suitable
+    .map(m => `<option value="${m.id}">${m.name}</option>`)
+    .join("");
+  const defaultModel = suitable.find(m => m.id.includes("grok-4.1-fast"));
+  if (defaultModel) $model.value = defaultModel.id;
+
+  document.getElementById("remix-cancel").addEventListener("click", () => overlay.remove());
+
+  $submit.addEventListener("click", async () => {
+    const instructions = document.getElementById("remix-instructions").value.trim();
+    if (!instructions) { alert("请输入改造指令"); return; }
+
+    $submit.disabled = true;
+    $submit.textContent = "生成中...";
+    $status.style.display = "block";
+    $status.textContent = "正在改造角色卡，这可能需要 30-60 秒...";
+
+    const original = JSON.parse(JSON.stringify(char));
+    delete original.id;
+
+    try {
+      const resp = await fetch("/api/characters/remix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ original, instructions, model: $model.value }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        $status.style.color = "var(--danger)";
+        $status.textContent = "生成失败: " + data.error;
+        if (data.raw) $status.textContent += "\n\n原始输出:\n" + data.raw;
+        $submit.disabled = false;
+        $submit.textContent = "重试";
+        return;
+      }
+
+      state.characters.push(data.character);
+      state.activeCharId = data.character.id;
+      renderCharSelect();
+      $charSelect.value = data.character.id;
+      onCharSelect();
+
+      $status.style.color = "var(--success)";
+      $status.textContent = `✅ 改造完成！新角色「${data.character.name}」已保存`;
+      $submit.textContent = "完成";
+      $submit.disabled = false;
+      $submit.addEventListener("click", () => overlay.remove(), { once: true });
+    } catch (e) {
+      $status.style.color = "var(--danger)";
+      $status.textContent = "请求失败: " + e.message;
+      $submit.disabled = false;
+      $submit.textContent = "重试";
+    }
+  });
 }
 
 function openCharEditor(existingChar) {

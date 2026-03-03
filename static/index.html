@@ -11,6 +11,8 @@
   <header>
     <h1>Model Playground</h1>
     <div class="header-actions">
+      <button id="btn-save-chat" title="保存当前对话">💾 保存</button>
+      <button id="btn-load-chat" title="查看已保存的对话">📋 记录</button>
       <button id="btn-clear" title="清空对话">清空对话</button>
     </div>
   </header>
@@ -40,6 +42,7 @@
           <div class="char-info-row">
             <span id="char-tags" class="char-tags"></span>
             <div class="char-info-actions">
+              <button id="btn-remix-char" title="AI 改造角色卡">🔄</button>
               <button id="btn-edit-char" title="编辑角色卡">✏️</button>
               <button id="btn-delete-char" class="danger" title="删除角色卡">🗑️</button>
             </div>
@@ -100,6 +103,26 @@
         <div class="selected-models">
           <span class="label">已选:</span>
           <div id="selected-tags"></div>
+        </div>
+      </section>
+
+      <!-- TTS Voice -->
+      <section class="panel">
+        <h3>语音朗读 TTS</h3>
+        <div class="char-field" style="margin-bottom:6px">
+          <label>音色</label>
+          <select id="tts-voice"></select>
+        </div>
+        <div class="tts-controls">
+          <label style="font-size:11px;color:var(--text-muted)">语速</label>
+          <select id="tts-rate" style="font-size:12px;padding:2px 4px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+            <option value="-50%">0.5x</option>
+            <option value="-25%">0.75x</option>
+            <option value="+0%" selected>1.0x</option>
+            <option value="+25%">1.25x</option>
+            <option value="+50%">1.5x</option>
+            <option value="+100%">2.0x</option>
+          </select>
         </div>
       </section>
 

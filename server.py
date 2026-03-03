@@ -1,12 +1,15 @@
+import io
 import json
 import os
+import re
 from pathlib import Path
 
+import edge_tts
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -29,6 +32,7 @@ DATA_DIR = Path("data")
 PRESETS_FILE = DATA_DIR / "presets.json"
 WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"
 CHARACTERS_FILE = DATA_DIR / "characters.json"
+CHATS_FILE = DATA_DIR / "chats.json"
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 
@@ -60,6 +64,14 @@ def load_worldbooks() -> list[dict]:
 
 def save_worldbooks(books: list[dict]):
     _save_json(WORLDBOOKS_FILE, books)
+
+
+def load_chats() -> list[dict]:
+    return _load_json(CHATS_FILE)
+
+
+def save_chats(chats: list[dict]):
+    _save_json(CHATS_FILE, chats)
 
 
 def load_characters() -> list[dict]:
@@ -256,6 +268,28 @@ async def generate_character(request: Request):
     return {"character": char_data}
 
 
+CHAR_REMIX_SYSTEM = """You are an expert character card designer specializing in remixing and transforming existing characters.
+
+You will receive:
+1. An existing character card in JSON format
+2. The user's modification instructions (new traits, themes, tags to add, aspects to change)
+
+Your task: Transform the character card according to the instructions while preserving the character's core identity where not contradicted.
+
+Rules:
+1. Naturally integrate the requested changes into ALL relevant fields (description, personality, scenario, first_mes, mes_example, system_prompt, character_book).
+2. Update the character_book: modify existing entries that relate to the changes, and ADD new entries (2-5) specifically covering the new traits/themes.
+3. Rewrite first_mes to reflect the changes while keeping the same immersive narrative scene style:
+   - Set atmosphere through environmental details
+   - Reveal traits INDIRECTLY through actions and dialogue
+   - Include *action/description* and spoken dialogue
+4. Update tags to include the new themes.
+5. Keep {{char}} and {{user}} placeholders intact.
+6. Write in the SAME language as the original card.
+7. The result must feel like a coherent, unified character — not a patchwork of old + new.
+8. Return ONLY valid JSON with the exact same structure as the input (no markdown, no explanation)."""
+
+
 CHAR_GEN_IMAGE_SYSTEM = """You are an expert character card designer for AI roleplay systems.
 You will receive an image of a character and optional supplementary notes.
 Based on the character's visual appearance (clothing, expression, body language, setting, style),
@@ -351,6 +385,77 @@ async def generate_character_from_image(
     return {"character": char_data}
 
 
+# ── Character Remix ──────────────────────────────────────────
+
+@app.post("/api/characters/remix")
+async def remix_character(request: Request):
+    body = await request.json()
+    original = body.get("original", {})
+    instructions = body.get("instructions", "")
+    model = body.get("model", "x-ai/grok-4.1-fast")
+
+    if not instructions.strip():
+        return JSONResponse({"error": "instructions is required"}, status_code=400)
+    if not original.get("name"):
+        return JSONResponse({"error": "original character is required"}, status_code=400)
+
+    card_json = json.dumps(original, ensure_ascii=False, indent=2)
+    user_msg = f"Original character card:\n```json\n{card_json}\n```\n\nModification instructions:\n{instructions}"
+
+    async with httpx.AsyncClient(timeout=180) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": CHAR_REMIX_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                "temperature": 0.85,
+                "max_tokens": 16000,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        detail = ""
+        try:
+            detail = resp.json().get("error", {}).get("message", resp.text[:300])
+        except Exception:
+            detail = resp.text[:300]
+        return JSONResponse(
+            {"error": f"LLM API error ({resp.status_code}): {detail}"},
+            status_code=502,
+        )
+
+    data = resp.json()
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    content = content.strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
+
+    try:
+        char_data = json.loads(content)
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            {"error": f"Failed to parse LLM output as JSON: {str(e)}", "raw": content[:500]},
+            status_code=422,
+        )
+
+    chars = load_characters()
+    char_data["id"] = _next_id(chars)
+    chars.append(char_data)
+    save_characters(chars)
+    return {"character": char_data}
+
+
 # ── Image Prompt Generation ─────────────────────────────────
 
 IMG_PROMPT_SYSTEM = """You are an expert at converting roleplay narrative text into image generation prompts.
@@ -409,6 +514,58 @@ async def generate_image_prompt(request: Request):
     data = resp.json()
     prompt = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     return {"prompt": prompt}
+
+
+# ── TTS (Edge-TTS) ──────────────────────────────────────────
+
+_tts_voices_cache: list[dict] | None = None
+
+
+@app.get("/api/tts/voices")
+async def list_tts_voices():
+    global _tts_voices_cache
+    if _tts_voices_cache is None:
+        voices = await edge_tts.list_voices()
+        _tts_voices_cache = [
+            {"id": v["ShortName"], "name": v["FriendlyName"],
+             "locale": v["Locale"], "gender": v["Gender"]}
+            for v in voices
+        ]
+    return {"voices": _tts_voices_cache}
+
+
+def _strip_rp_markers(text: str) -> str:
+    """Remove markdown-style RP action markers and angle bracket tags for cleaner TTS."""
+    text = re.sub(r'\*([^*]+)\*', r'\1', text)
+    text = re.sub(r'<[^>]+>', '', text)
+    return text.strip()
+
+
+@app.post("/api/tts/speak")
+async def tts_speak(request: Request):
+    body = await request.json()
+    text = body.get("text", "")
+    voice = body.get("voice", "zh-CN-XiaoxiaoNeural")
+    rate = body.get("rate", "+0%")
+    pitch = body.get("pitch", "+0Hz")
+
+    if not text.strip():
+        return JSONResponse({"error": "text is required"}, status_code=400)
+
+    clean_text = _strip_rp_markers(text)
+    communicate = edge_tts.Communicate(clean_text, voice, rate=rate, pitch=pitch)
+
+    buf = io.BytesIO()
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            buf.write(chunk["data"])
+
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline; filename=tts.mp3"},
+    )
 
 
 # ── Chat completion (streaming) ─────────────────────────────
@@ -480,6 +637,59 @@ async def delete_preset(preset_id: int):
     presets = load_presets()
     presets = [p for p in presets if p["id"] != preset_id]
     save_presets(presets)
+    return {"ok": True}
+
+
+# ── Chats CRUD ──────────────────────────────────────────────
+
+@app.get("/api/chats")
+async def get_chats():
+    chats = load_chats()
+    summary = [
+        {"id": c["id"], "name": c.get("name", ""), "timestamp": c.get("timestamp", ""),
+         "charName": c.get("charName", ""), "models": c.get("selectedModels", [])}
+        for c in chats
+    ]
+    return {"chats": summary}
+
+
+@app.post("/api/chats")
+async def create_chat(request: Request):
+    chat = await request.json()
+    chats = load_chats()
+    chat["id"] = _next_id(chats)
+    chats.append(chat)
+    save_chats(chats)
+    return {"chat": {"id": chat["id"], "name": chat.get("name", "")}}
+
+
+@app.get("/api/chats/{chat_id}")
+async def get_chat(chat_id: int):
+    chats = load_chats()
+    for c in chats:
+        if c["id"] == chat_id:
+            return {"chat": c}
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.put("/api/chats/{chat_id}")
+async def update_chat(chat_id: int, request: Request):
+    updated = await request.json()
+    chats = load_chats()
+    for i, c in enumerate(chats):
+        if c["id"] == chat_id:
+            updated["id"] = chat_id
+            chats[i] = updated
+            save_chats(chats)
+            return {"chat": {"id": chat_id, "name": updated.get("name", "")}}
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.delete("/api/chats/{chat_id}")
+async def delete_chat(chat_id: int):
+    chats = load_chats()
+    chats = [c for c in chats if c["id"] != chat_id]
+    save_chats(chats)
     return {"ok": True}
 
 

@@ -48,6 +48,10 @@ header h1 {
   transition: all 0.15s;
 }
 .header-actions button:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.header-actions button:last-child:hover {
   color: var(--danger);
   border-color: var(--danger);
 }
@@ -865,3 +869,64 @@ header h1 {
   background: var(--accent); color: #000; border: none; font-weight: 500;
 }
 .img-prompt-copy:hover { background: var(--accent-hover); }
+
+/* ── Chat History List ── */
+.chat-history-item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  margin-bottom: 8px; background: var(--surface); transition: border-color 0.15s;
+}
+.chat-history-item:hover { border-color: var(--accent); }
+.chat-history-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+.chat-history-name {
+  font-size: 14px; font-weight: 500; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-history-meta {
+  font-size: 11px; color: var(--text-muted);
+}
+.chat-history-sub {
+  width: 100%; display: flex; gap: 12px; font-size: 11px; color: var(--text-muted);
+}
+.chat-history-char, .chat-history-models {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px;
+}
+.chat-history-actions {
+  display: flex; gap: 6px; flex-shrink: 0;
+}
+.chat-load-btn {
+  padding: 4px 14px; font-size: 12px; border-radius: 4px; cursor: pointer;
+  background: var(--accent); color: #000; border: none; font-weight: 500;
+  transition: background 0.15s;
+}
+.chat-load-btn:hover { background: var(--accent-hover); }
+.chat-delete-btn {
+  padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer;
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  transition: all 0.15s;
+}
+.chat-delete-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ── TTS ── */
+.tts-controls {
+  display: flex; align-items: center; gap: 8px;
+}
+.tts-playing {
+  animation: tts-pulse 1s ease-in-out infinite;
+  border-color: var(--accent) !important; color: var(--accent) !important;
+}
+@keyframes tts-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Remix Card Preview ── */
+.remix-card-preview {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-top: 8px;
+}
+.remix-card-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.remix-card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
