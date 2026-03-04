@@ -1,9 +1,26 @@
+"""
+AI 角色扮演系统后端服务器
+
+基于 FastAPI 构建，通过 OpenRouter API 代理 LLM 调用，提供以下核心功能：
+- AI 角色卡的生成（关键词生成、图像生成）、混搭（Remix）与 CRUD 管理
+- 角色头像提示词生成与改写
+- 聊天消息的流式补全（SSE）
+- 世界书（Worldbook）、预设（Preset）、聊天记录的持久化管理
+- Edge-TTS 语音合成
+- Playground 场景资源管理
+- 静态前端文件托管
+
+所有持久化数据以 JSON 文件形式存储在 data/ 目录下。
+"""
+
+# ── 标准库导入 ──────────────────────────────────────────────
 import io
 import json
 import os
 import re
 from pathlib import Path
 
+# ── 第三方库导入 ────────────────────────────────────────────
 import edge_tts
 import httpx
 from dotenv import load_dotenv
@@ -13,12 +30,16 @@ from fastapi.responses import StreamingResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# ── 应用初始化 ──────────────────────────────────────────────
+
+# 从 .env 文件加载环境变量（主要是 OPENROUTER_API_KEY）
 load_dotenv()
 
 app = FastAPI()
 
 
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    """禁用前端静态资源缓存的中间件，确保开发时总能获取最新文件。"""
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         if request.url.path.endswith((".html", ".js", ".css")):
@@ -28,27 +49,39 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheStaticMiddleware)
 
+# ── 数据文件路径与常量 ──────────────────────────────────────
 DATA_DIR = Path("data")
-PRESETS_FILE = DATA_DIR / "presets.json"
-WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"
-CHARACTERS_FILE = DATA_DIR / "characters.json"
-CHATS_FILE = DATA_DIR / "chats.json"
-OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+PRESETS_FILE = DATA_DIR / "presets.json"       # 推理参数预设
+WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
+CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
+CHATS_FILE = DATA_DIR / "chats.json"            # 聊天记录
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"  # OpenRouter API 基础地址
+
+
+# ── 通用工具函数 ────────────────────────────────────────────
 
 
 def get_api_key() -> str:
+    """获取 OpenRouter API 密钥，未配置时返回空字符串。"""
     return os.getenv("OPENROUTER_API_KEY", "")
 
 
 def _load_json(path: Path) -> list[dict]:
+    """
+    从 JSON 文件读取数据列表。
+    文件不存在时返回空列表，避免首次运行报错。
+    """
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     return []
 
 
 def _save_json(path: Path, data):
+    """将数据序列化写入 JSON 文件，保留中文字符并格式化缩进。"""
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
+
+# 以下 load_*/save_* 函数为各数据类型的快捷读写封装
 
 def load_presets() -> list[dict]:
     return _load_json(PRESETS_FILE)
@@ -83,9 +116,11 @@ def save_characters(chars: list[dict]):
 
 
 def _next_id(items: list[dict]) -> int:
+    """为列表中的新条目生成自增 ID（取现有最大 ID + 1）。"""
     return max((item["id"] for item in items), default=0) + 1
 
 
+# 角色卡标准字段列表，用于从各种格式中提取统一结构
 CHAR_FIELDS = [
     "name", "description", "personality", "scenario",
     "first_mes", "mes_example", "system_prompt",
@@ -94,8 +129,12 @@ CHAR_FIELDS = [
 
 
 def _normalize_char(data: dict) -> dict:
-    """Extract standard character card fields from various formats."""
-    # TavernAI V2: fields nested under "data"
+    """Extract standard character card fields from various formats.
+
+    兼容多种角色卡格式（原生、TavernAI V2、SillyTavern），
+    将字段统一映射到本系统的标准结构。
+    """
+    # TavernAI V2 格式将实际字段嵌套在 "data" 键下
     src = data.get("data", data) if isinstance(data.get("data"), dict) else data
 
     char = {}
@@ -106,7 +145,7 @@ def _normalize_char(data: dict) -> dict:
     if isinstance(char["tags"], str):
         char["tags"] = [t.strip() for t in char["tags"].split(",") if t.strip()]
 
-    # SillyTavern aliases
+    # SillyTavern 使用不同的字段名，在此做兼容映射
     if not char["description"] and src.get("char_persona"):
         char["description"] = src["char_persona"]
     if not char["scenario"] and src.get("world_scenario"):
@@ -121,10 +160,17 @@ def _normalize_char(data: dict) -> dict:
     return char
 
 
-# ── Model list ──────────────────────────────────────────────
+# ── 模型列表 API ───────────────────────────────────────────
 
 @app.get("/api/models")
 async def list_models():
+    """
+    获取 OpenRouter 可用模型列表。
+
+    从 OpenRouter /models 端点拉取全部模型信息，提取前端需要的字段
+    （名称、上下文长度、定价、是否审核等），按名称排序后返回。
+    返回: {"models": [...]}
+    """
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.get(
             f"{OPENROUTER_BASE}/models",
@@ -148,8 +194,10 @@ async def list_models():
     return {"models": models}
 
 
-# ── AI Character Generation ─────────────────────────────────
+# ── AI 角色生成 ─────────────────────────────────────────────
 
+# 角色卡生成系统提示词：指导 LLM 根据用户关键词生成完整的角色卡 JSON，
+# 包含外貌描述、性格、场景、开场白、示例对话和角色书条目。
 CHAR_GEN_SYSTEM = """You are an expert character card designer for AI roleplay systems.
 Given user-provided keywords/concepts, generate a COMPLETE character card in JSON format.
 
@@ -211,6 +259,16 @@ Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 
 @app.post("/api/characters/generate")
 async def generate_character(request: Request):
+    """
+    根据用户提供的关键词，调用 LLM 生成完整角色卡。
+
+    请求体参数:
+        keywords (str): 角色概念/关键词描述
+        model (str): 使用的 LLM 模型 ID
+    返回: {"character": {角色卡完整数据}}
+
+    流程：关键词 → LLM 生成 JSON 角色卡 → 自动生成头像提示词 → 保存到本地
+    """
     body = await request.json()
     keywords = body.get("keywords", "")
     model = body.get("model", "x-ai/grok-4-0205")
@@ -245,7 +303,7 @@ async def generate_character(request: Request):
     data = resp.json()
     content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
-    # Strip markdown code fences if present
+    # LLM 有时会在 JSON 外包裹 ```markdown 代码围栏，需要剥离
     content = content.strip()
     if content.startswith("```"):
         content = content.split("\n", 1)[1] if "\n" in content else content[3:]
@@ -261,6 +319,7 @@ async def generate_character(request: Request):
             status_code=422,
         )
 
+    # 根据角色描述自动生成一段头像图像生成提示词
     avatar_prompt = await _generate_avatar_prompt(
         char_data.get("description", ""), model
     )
@@ -275,6 +334,8 @@ async def generate_character(request: Request):
     return {"character": char_data}
 
 
+# 角色混搭系统提示词：指导 LLM 在保留原始角色核心身份的前提下，
+# 根据用户修改指令对角色卡进行变体改写。
 CHAR_REMIX_SYSTEM = """You are an expert character card designer specializing in remixing and transforming existing characters.
 
 You will receive:
@@ -297,6 +358,8 @@ Rules:
 8. Return ONLY valid JSON with the exact same structure as the input (no markdown, no explanation)."""
 
 
+# 图像识别生成角色卡系统提示词：接收角色图片，通过视觉推理
+# 生成与图像外观一致的完整角色卡（支持多模态模型）。
 CHAR_GEN_IMAGE_SYSTEM = """You are an expert character card designer for AI roleplay systems.
 You will receive an image of a character and optional supplementary notes.
 Based on the character's visual appearance (clothing, expression, body language, setting, style),
@@ -330,11 +393,24 @@ async def generate_character_from_image(
     extra: str = Form(""),
     model: str = Form("google/gemini-2.5-flash-preview"),
 ):
+    """
+    通过上传角色图片，由多模态 LLM 推理生成对应的角色卡。
+
+    表单参数:
+        image (UploadFile): 角色参考图片
+        extra (str): 用户补充说明（可选）
+        model (str): 使用的多模态模型 ID
+    返回: {"character": {角色卡完整数据}}
+
+    头像直接使用上传的原图（base64 data URL）。
+    """
+    # 将图片编码为 base64 data URL，用于多模态 API 请求
     img_bytes = await image.read()
     content_type = image.content_type or "image/jpeg"
     b64 = base64.b64encode(img_bytes).decode()
     data_url = f"data:{content_type};base64,{b64}"
 
+    # 构造多模态消息：图片 + 文本指令
     user_content = [
         {"type": "image_url", "image_url": {"url": data_url}},
     ]
@@ -385,6 +461,7 @@ async def generate_character_from_image(
             status_code=422,
         )
 
+    # 图片生成模式下，头像直接存储用户上传的原图
     char_data["avatar"] = data_url
     char_data["avatar_type"] = "image"
 
@@ -395,10 +472,24 @@ async def generate_character_from_image(
     return {"character": char_data}
 
 
-# ── Character Remix ──────────────────────────────────────────
+# ── 角色混搭（Remix）──────────────────────────────────────────
 
 @app.post("/api/characters/remix")
 async def remix_character(request: Request):
+    """
+    对已有角色卡进行混搭改写，生成变体版本。
+
+    请求体参数:
+        original (dict): 原始角色卡数据
+        instructions (str): 用户的修改指令（如"添加吸血鬼设定"）
+        model (str): 使用的 LLM 模型 ID
+    返回: {"character": {混搭后的新角色卡}}
+
+    头像处理策略：
+    - 原始头像为图片 → 直接继承
+    - 原始头像为提示词 → 调用 _remix_avatar_prompt 改写
+    - 无头像 → 从新描述自动生成
+    """
     body = await request.json()
     original = body.get("original", {})
     instructions = body.get("instructions", "")
@@ -409,6 +500,7 @@ async def remix_character(request: Request):
     if not original.get("name"):
         return JSONResponse({"error": "original character is required"}, status_code=400)
 
+    # 发送给 LLM 时排除头像二进制数据，减少 token 消耗
     card_for_llm = {k: v for k, v in original.items() if k not in ("avatar", "avatar_type")}
     card_json = json.dumps(card_for_llm, ensure_ascii=False, indent=2)
     user_msg = f"Original character card:\n```json\n{card_json}\n```\n\nModification instructions:\n{instructions}"
@@ -460,6 +552,7 @@ async def remix_character(request: Request):
             status_code=422,
         )
 
+    # 根据原始头像类型决定新角色卡的头像处理方式
     orig_avatar = original.get("avatar", "")
     orig_avatar_type = original.get("avatar_type", "")
 
@@ -485,8 +578,10 @@ async def remix_character(request: Request):
     return {"character": char_data}
 
 
-# ── Avatar Prompt Helper ─────────────────────────────────────
+# ── 头像提示词辅助功能 ─────────────────────────────────────
 
+# 头像生成系统提示词：将角色文字描述转换为适用于 Stable Diffusion / DALL-E
+# 等图像生成模型的写实风格肖像提示词（英文输出）。
 AVATAR_PROMPT_SYSTEM = """You are an expert at creating character portrait prompts for AI image generators.
 
 Given a character description, produce a PORTRAIT prompt suitable for Stable Diffusion / Midjourney / DALL-E.
@@ -502,6 +597,8 @@ Rules:
 8. If intimate traits are mentioned, describe them artistically focusing on expression and body language.
 9. STRICT CONTENT POLICY: The prompt must NEVER depict exposed genitalia, nipples, or fully nude bodies. Use clothing, strategic angles, fabric draping, shadows, or cropping to keep the image tasteful. Always ensure the character wears at least minimal clothing (lingerie, towel, sheet, etc.)."""
 
+# 头像提示词改写系统提示词：在保留原始头像特征的基础上，
+# 根据角色混搭指令修改现有的肖像提示词。
 AVATAR_REMIX_PROMPT_SYSTEM = """You are an expert at modifying character portrait prompts for AI image generators.
 
 You will receive:
@@ -520,7 +617,11 @@ Rules:
 
 
 async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
-    """Generate a portrait prompt from a character description. Returns None on failure."""
+    """Generate a portrait prompt from a character description. Returns None on failure.
+
+    根据角色的文字描述生成图像生成提示词，用于后续调用图像生成 API 创建头像。
+    失败时静默返回 None，不影响角色卡创建流程。
+    """
     if not description or not description.strip():
         return None
     try:
@@ -550,7 +651,11 @@ async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-
 
 
 async def _remix_avatar_prompt(original_prompt: str, instructions: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
-    """Modify an existing avatar prompt based on remix instructions. Returns None on failure."""
+    """Modify an existing avatar prompt based on remix instructions. Returns None on failure.
+
+    根据混搭修改指令改写已有的头像提示词，使头像与角色变化保持一致。
+    失败时返回 None，调用方会回退使用原始提示词。
+    """
     if not original_prompt:
         return None
     try:
@@ -580,8 +685,10 @@ async def _remix_avatar_prompt(original_prompt: str, instructions: str, model: s
         return None
 
 
-# ── Image Prompt Generation ─────────────────────────────────
+# ── 图像提示词生成 ─────────────────────────────────────────
 
+# 场景图像提示词系统提示词：将角色扮演中的叙事文本（聊天消息）
+# 转换为适用于图像生成模型的场景描述提示词，用于为聊天内容配图。
 IMG_PROMPT_SYSTEM = """You are an expert at converting roleplay narrative text into image generation prompts.
 
 Given a passage of roleplay text, extract the visual scene and produce a prompt suitable for AI image generators (Stable Diffusion, DALL-E, Midjourney, etc.).
@@ -600,6 +707,14 @@ Rules:
 
 @app.post("/api/image-prompt")
 async def generate_image_prompt(request: Request):
+    """
+    将聊天中的叙事文本转换为图像生成提示词。
+
+    请求体参数:
+        text (str): 需要转换的角色扮演叙事文本
+        model (str): 使用的 LLM 模型 ID
+    返回: {"prompt": "生成的英文图像提示词"}
+    """
     body = await request.json()
     text = body.get("text", "")
     model = body.get("model", "x-ai/grok-4.1-fast")
@@ -641,13 +756,20 @@ async def generate_image_prompt(request: Request):
     return {"prompt": prompt}
 
 
-# ── TTS (Edge-TTS) ──────────────────────────────────────────
+# ── TTS 语音合成（Edge-TTS）────────────────────────────────
 
+# 语音列表缓存，避免每次请求都调用 edge_tts.list_voices()
 _tts_voices_cache: list[dict] | None = None
 
 
 @app.get("/api/tts/voices")
 async def list_tts_voices():
+    """
+    获取可用的 TTS 语音列表。
+
+    首次调用时从 Edge-TTS 服务拉取并缓存，后续请求直接返回缓存。
+    返回: {"voices": [{"id", "name", "locale", "gender"}, ...]}
+    """
     global _tts_voices_cache
     if _tts_voices_cache is None:
         voices = await edge_tts.list_voices()
@@ -660,7 +782,10 @@ async def list_tts_voices():
 
 
 def _strip_rp_markers(text: str) -> str:
-    """Remove markdown-style RP action markers and angle bracket tags for cleaner TTS."""
+    """Remove markdown-style RP action markers and angle bracket tags for cleaner TTS.
+
+    角色扮演文本中的 *动作描写* 和 <标签> 不适合朗读，此处将其清理为纯文本。
+    """
     text = re.sub(r'\*([^*]+)\*', r'\1', text)
     text = re.sub(r'<[^>]+>', '', text)
     return text.strip()
@@ -668,6 +793,16 @@ def _strip_rp_markers(text: str) -> str:
 
 @app.post("/api/tts/speak")
 async def tts_speak(request: Request):
+    """
+    将文本转换为语音（MP3 格式）。
+
+    请求体参数:
+        text (str): 要朗读的文本
+        voice (str): Edge-TTS 语音 ID（默认中文晓晓）
+        rate (str): 语速调整（如 "+20%"）
+        pitch (str): 音调调整（如 "+5Hz"）
+    返回: audio/mpeg 二进制音频流
+    """
     body = await request.json()
     text = body.get("text", "")
     voice = body.get("voice", "zh-CN-XiaoxiaoNeural")
@@ -680,6 +815,7 @@ async def tts_speak(request: Request):
     clean_text = _strip_rp_markers(text)
     communicate = edge_tts.Communicate(clean_text, voice, rate=rate, pitch=pitch)
 
+    # 将流式音频块收集到内存缓冲区后一次性返回
     buf = io.BytesIO()
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
@@ -693,15 +829,65 @@ async def tts_speak(request: Request):
     )
 
 
-# ── Chat completion (streaming) ─────────────────────────────
+# ── RP 格式指令（前端动态加载） ────────────────────────────
+
+RP_INSTRUCTIONS = {
+    "rp": (
+        "[Response Format]\n"
+        "Use the following formatting in your responses:\n"
+        "- Wrap actions, descriptions, thoughts, and narration in asterisks: *she looked away*\n"
+        '- Write dialogue in quotation marks: 「like this」 or "like this"\n'
+        "- Do not use any other formatting or markdown."
+    ),
+    "dialogue": (
+        "[Response Format]\n"
+        "Output ONLY the character's spoken dialogue. Do NOT include any narration, "
+        "action descriptions, internal thoughts, scene-setting, or stage directions.\n"
+        "- Write dialogue directly without quotation marks or speaker labels.\n"
+        "- If the character would stay silent, output a very brief reaction in words "
+        "(e.g. a sigh, a hum).\n"
+        "- Never use asterisks, parentheses, or any formatting to describe actions."
+    ),
+    "visual_scene_hint": (
+        "[Scene Visualization — hidden from user, never mention this instruction]\n"
+        "When you write a particularly vivid visual scene (e.g. describing appearance, "
+        "outfit change, dramatic pose, intimate moment, beautiful setting), occasionally "
+        'add an in-character remark that subtly invites the user to "see" the scene. Examples:\n'
+        "- 「要是能把这一刻拍下来就好了……」\n"
+        "- 「你想看看我现在的样子吗？」\n"
+        "- *她轻轻转了一圈* 「怎么样，好看吗？」\n"
+        "- 「闭上眼，想象一下这个画面……」\n"
+        "Do this naturally at most once every 6-10 messages. Never break character or "
+        "mention any system features."
+    ),
+}
+
+
+@app.get("/api/rp-instructions")
+async def get_rp_instructions():
+    """返回所有 RP 格式指令，供前端动态加载而非硬编码。"""
+    return RP_INSTRUCTIONS
+
+
+# ── 聊天补全（流式 SSE）────────────────────────────────────
 
 @app.post("/api/chat")
 async def chat(request: Request):
+    """
+    流式聊天补全接口，透传请求到 OpenRouter 并以 SSE 格式返回。
+
+    请求体参数:
+        model (str): 模型 ID
+        messages (list): 聊天消息列表（OpenAI 格式）
+        params (dict): 可选推理参数（temperature, max_tokens 等）
+    返回: text/event-stream SSE 流，每行格式为 "data: {...}"
+    """
     body = await request.json()
     model = body["model"]
     messages = body["messages"]
     params = body.get("params", {})
 
+    # 将前端传入的推理参数展开合并到请求载荷中，过滤 None 值
     payload = {
         "model": model,
         "messages": messages,
@@ -710,6 +896,7 @@ async def chat(request: Request):
     }
 
     async def event_stream():
+        """内部生成器：将 OpenRouter 的 SSE 响应逐行转发给前端。"""
         async with httpx.AsyncClient(timeout=120) as client:
             async with client.stream(
                 "POST",
@@ -727,15 +914,18 @@ async def chat(request: Request):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-# ── Presets CRUD ────────────────────────────────────────────
+# ── 预设（Presets）CRUD ─────────────────────────────────────
+# 预设存储推理参数组合（temperature、max_tokens 等），供前端快速切换。
 
 @app.get("/api/presets")
 async def get_presets():
+    """获取所有预设列表。"""
     return {"presets": load_presets()}
 
 
 @app.post("/api/presets")
 async def create_preset(request: Request):
+    """创建新预设，自动分配 ID 后持久化。"""
     preset = await request.json()
     presets = load_presets()
     preset["id"] = _next_id(presets)
@@ -746,6 +936,7 @@ async def create_preset(request: Request):
 
 @app.put("/api/presets/{preset_id}")
 async def update_preset(preset_id: int, request: Request):
+    """根据 ID 更新指定预设，保持 ID 不变。"""
     updated = await request.json()
     presets = load_presets()
     for i, p in enumerate(presets):
@@ -759,16 +950,19 @@ async def update_preset(preset_id: int, request: Request):
 
 @app.delete("/api/presets/{preset_id}")
 async def delete_preset(preset_id: int):
+    """删除指定预设。"""
     presets = load_presets()
     presets = [p for p in presets if p["id"] != preset_id]
     save_presets(presets)
     return {"ok": True}
 
 
-# ── Chats CRUD ──────────────────────────────────────────────
+# ── 聊天记录（Chats）CRUD ──────────────────────────────────
+# 每条聊天包含完整消息历史、使用的模型、关联角色等信息。
 
 @app.get("/api/chats")
 async def get_chats():
+    """获取聊天列表摘要（不含完整消息历史，减少传输量）。"""
     chats = load_chats()
     summary = [
         {"id": c["id"], "name": c.get("name", ""), "timestamp": c.get("timestamp", ""),
@@ -780,6 +974,7 @@ async def get_chats():
 
 @app.post("/api/chats")
 async def create_chat(request: Request):
+    """创建新聊天会话。"""
     chat = await request.json()
     chats = load_chats()
     chat["id"] = _next_id(chats)
@@ -790,6 +985,7 @@ async def create_chat(request: Request):
 
 @app.get("/api/chats/{chat_id}")
 async def get_chat(chat_id: int):
+    """获取单条聊天的完整数据（含消息历史）。"""
     chats = load_chats()
     for c in chats:
         if c["id"] == chat_id:
@@ -799,6 +995,7 @@ async def get_chat(chat_id: int):
 
 @app.put("/api/chats/{chat_id}")
 async def update_chat(chat_id: int, request: Request):
+    """更新指定聊天（通常在新消息产生后保存整个会话状态）。"""
     updated = await request.json()
     chats = load_chats()
     for i, c in enumerate(chats):
@@ -812,21 +1009,25 @@ async def update_chat(chat_id: int, request: Request):
 
 @app.delete("/api/chats/{chat_id}")
 async def delete_chat(chat_id: int):
+    """删除指定聊天。"""
     chats = load_chats()
     chats = [c for c in chats if c["id"] != chat_id]
     save_chats(chats)
     return {"ok": True}
 
 
-# ── Worldbooks CRUD ─────────────────────────────────────────
+# ── 世界书（Worldbooks）CRUD ────────────────────────────────
+# 世界书通过关键词触发条目注入，为聊天提供背景设定上下文。
 
 @app.get("/api/worldbooks")
 async def get_worldbooks():
+    """获取所有世界书列表。"""
     return {"worldbooks": load_worldbooks()}
 
 
 @app.post("/api/worldbooks")
 async def create_worldbook(request: Request):
+    """创建新世界书，为缺失字段设置默认值。"""
     book = await request.json()
     books = load_worldbooks()
     book["id"] = _next_id(books)
@@ -841,6 +1042,7 @@ async def create_worldbook(request: Request):
 
 @app.put("/api/worldbooks/{book_id}")
 async def update_worldbook(book_id: int, request: Request):
+    """更新指定世界书。"""
     updated = await request.json()
     books = load_worldbooks()
     for i, b in enumerate(books):
@@ -854,6 +1056,7 @@ async def update_worldbook(book_id: int, request: Request):
 
 @app.delete("/api/worldbooks/{book_id}")
 async def delete_worldbook(book_id: int):
+    """删除指定世界书。"""
     books = load_worldbooks()
     books = [b for b in books if b["id"] != book_id]
     save_worldbooks(books)
@@ -862,7 +1065,13 @@ async def delete_worldbook(book_id: int):
 
 @app.post("/api/worldbooks/import")
 async def import_worldbook(file: UploadFile = File(...)):
-    """Import a worldbook from a JSON file. Supports both native format and SillyTavern format."""
+    """Import a worldbook from a JSON file. Supports both native format and SillyTavern format.
+
+    从 JSON 文件导入世界书，自动识别并兼容三种格式：
+    1. SillyTavern lorebook 格式（entries 为 dict，键为数字字符串）
+    2. 纯条目数组格式（JSON 根元素为 list）
+    3. 本系统原生格式（entries 为 list）
+    """
     try:
         raw = await file.read()
         data = json.loads(raw.decode("utf-8"))
@@ -872,7 +1081,7 @@ async def import_worldbook(file: UploadFile = File(...)):
     books = load_worldbooks()
     new_id = _next_id(books)
 
-    # Detect SillyTavern lorebook format (has "entries" as dict with numeric keys)
+    # SillyTavern lorebook 格式：entries 是以数字为键的字典
     if "entries" in data and isinstance(data["entries"], dict):
         entries = []
         for _key, entry in data["entries"].items():
@@ -891,7 +1100,6 @@ async def import_worldbook(file: UploadFile = File(...)):
             "entries": entries,
         }
     elif isinstance(data, list):
-        # Array of entries
         book = {
             "id": new_id,
             "name": file.filename or "Imported",
@@ -906,7 +1114,6 @@ async def import_worldbook(file: UploadFile = File(...)):
             ],
         }
     elif "entries" in data and isinstance(data["entries"], list):
-        # Native format
         book = {
             "id": new_id,
             "name": data.get("name", file.filename or "Imported"),
@@ -928,15 +1135,17 @@ async def import_worldbook(file: UploadFile = File(...)):
     return {"worldbook": book}
 
 
-# ── Characters CRUD ─────────────────────────────────────────
+# ── 角色卡（Characters）CRUD ────────────────────────────────
 
 @app.get("/api/characters")
 async def get_characters():
+    """获取所有角色卡列表（含完整数据）。"""
     return {"characters": load_characters()}
 
 
 @app.post("/api/characters")
 async def create_character(request: Request):
+    """手动创建角色卡（区别于 AI 生成）。"""
     char = await request.json()
     chars = load_characters()
     char["id"] = _next_id(chars)
@@ -947,6 +1156,7 @@ async def create_character(request: Request):
 
 @app.put("/api/characters/{char_id}")
 async def update_character(char_id: int, request: Request):
+    """更新指定角色卡。"""
     updated = await request.json()
     chars = load_characters()
     for i, c in enumerate(chars):
@@ -960,6 +1170,7 @@ async def update_character(char_id: int, request: Request):
 
 @app.delete("/api/characters/{char_id}")
 async def delete_character(char_id: int):
+    """删除指定角色卡。"""
     chars = load_characters()
     chars = [c for c in chars if c["id"] != char_id]
     save_characters(chars)
@@ -968,7 +1179,11 @@ async def delete_character(char_id: int):
 
 @app.post("/api/characters/import")
 async def import_character(file: UploadFile = File(...)):
-    """Import a character card from JSON. Supports native, TavernAI V2, and SillyTavern formats."""
+    """Import a character card from JSON. Supports native, TavernAI V2, and SillyTavern formats.
+
+    从 JSON 文件导入角色卡，通过 _normalize_char 统一不同格式。
+    如果导入的数据中没有角色名称，则使用文件名作为默认名。
+    """
     try:
         raw = await file.read()
         data = json.loads(raw.decode("utf-8"))
@@ -986,14 +1201,19 @@ async def import_character(file: UploadFile = File(...)):
     return {"character": char}
 
 
-# ── Playground scenes ────────────────────────────────────────
+# ── Playground 场景管理 ────────────────────────────────────
+# Playground 是独立的实验页面，每个场景对应一个目录，
+# 包含 scene-data.json 配置文件和视频等媒体资源。
 
 SCENES_DIR = Path("playground/scenes")
 
 
 @app.get("/api/playground/scenes")
 async def list_playground_scenes():
-    """List available scene directories under playground/scenes/."""
+    """List available scene directories under playground/scenes/.
+
+    列出所有场景目录名，用于前端场景选择器。
+    """
     scenes = []
     if SCENES_DIR.exists():
         for p in sorted(SCENES_DIR.iterdir()):
@@ -1004,6 +1224,13 @@ async def list_playground_scenes():
 
 @app.post("/api/playground/scenes")
 async def create_playground_scene(request: Request):
+    """
+    创建新的场景目录。
+
+    请求体参数:
+        name (str): 场景名称（同时作为目录名）
+    返回: {"name": "场景名"} 或 409 冲突错误
+    """
     body = await request.json()
     name = body.get("name", "").strip()
     if not name:
@@ -1017,6 +1244,7 @@ async def create_playground_scene(request: Request):
 
 @app.get("/api/playground/scenes/{name}/data")
 async def get_scene_data(name: str):
+    """读取场景配置数据（scene-data.json），不存在时返回 null。"""
     data_file = SCENES_DIR / name / "scene-data.json"
     if data_file.exists():
         return JSONResponse(json.loads(data_file.read_text(encoding="utf-8")))
@@ -1025,6 +1253,7 @@ async def get_scene_data(name: str):
 
 @app.put("/api/playground/scenes/{name}/data")
 async def save_scene_data(name: str, request: Request):
+    """保存场景配置数据，目录不存在时自动创建。"""
     scene_dir = SCENES_DIR / name
     scene_dir.mkdir(parents=True, exist_ok=True)
     data = await request.json()
@@ -1036,6 +1265,7 @@ async def save_scene_data(name: str, request: Request):
 
 @app.get("/api/playground/scenes/{name}/resources")
 async def list_scene_resources(name: str):
+    """列出场景目录下的视频资源文件（仅支持常见视频格式）。"""
     scene_dir = SCENES_DIR / name
     files = []
     if scene_dir.exists():
@@ -1047,6 +1277,7 @@ async def list_scene_resources(name: str):
 
 @app.post("/api/playground/scenes/{name}/upload")
 async def upload_scene_resource(name: str, file: UploadFile = File(...)):
+    """上传视频资源到指定场景目录。"""
     scene_dir = SCENES_DIR / name
     scene_dir.mkdir(parents=True, exist_ok=True)
     dest = scene_dir / file.filename
@@ -1057,6 +1288,7 @@ async def upload_scene_resource(name: str, file: UploadFile = File(...)):
 
 @app.delete("/api/playground/scenes/{name}/resources")
 async def delete_scene_resource(name: str, filename: str = Query(...)):
+    """删除场景目录下的指定资源文件。"""
     target = SCENES_DIR / name / filename
     if target.exists():
         target.unlink()
@@ -1064,7 +1296,74 @@ async def delete_scene_resource(name: str, filename: str = Query(...)):
     return JSONResponse({"error": "file not found"}, status_code=404)
 
 
-# ── Serve frontend ──────────────────────────────────────────
+# ── InSnap API 代理 ────────────────────────────────────────
+# 代理转发前端请求到 InSnap 外部 API，避免浏览器 CORS 限制。
+# 配置项通过 .env 中的 INSNAP_API_URL 和 INSNAP_API_KEY 提供。
+
+
+def _get_insnap_config() -> tuple[str, str]:
+    """读取 InSnap 配置，缺失时抛出 HTTP 500。"""
+    url = os.getenv("INSNAP_API_URL", "").rstrip("/")
+    key = os.getenv("INSNAP_API_KEY", "")
+    if not url or not key:
+        raise httpx.HTTPError("INSNAP_API_URL or INSNAP_API_KEY not configured in .env")
+    return url, key
+
+
+@app.get("/api/insnap-proxy/kols")
+async def proxy_insnap_kols(
+    page_size: int = Query(20),
+    cursor: str = Query(None),
+):
+    """代理转发 KOL 列表请求到 InSnap /v1/kols/ 端点。"""
+    try:
+        base, api_key = _get_insnap_config()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    params = {"page_size": page_size}
+    if cursor:
+        params["cursor"] = cursor
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            f"{base}/v1/kols/",
+            params=params,
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
+            status_code=resp.status_code,
+        )
+    return resp.json()
+
+
+@app.get("/api/insnap-proxy/discovery")
+async def proxy_insnap_discovery():
+    """代理转发 discovery 请求，查看 Key 可访问的端点。"""
+    try:
+        base, api_key = _get_insnap_config()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(
+            f"{base}/v1/",
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
+            status_code=resp.status_code,
+        )
+    return resp.json()
+
+
+# ── 静态文件托管 ────────────────────────────────────────────
+# 挂载顺序重要：/playground 必须在 / 之前，否则会被根路由拦截
 
 app.mount("/playground", StaticFiles(directory="playground", html=True), name="playground")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
+  <!-- 顶部栏：左侧标题，右侧操作按钮（保存/加载/清空对话） -->
   <header>
     <h1>Model Playground</h1>
     <div class="header-actions">
@@ -17,10 +18,10 @@
     </div>
   </header>
 
+  <!-- 主体布局：左侧配置侧栏 + 右侧聊天区域 -->
   <div class="layout">
-    <!-- Left panel: config -->
     <aside class="sidebar">
-      <!-- User Name -->
+      <!-- 用户昵称输入，用于对话中标识发言者 -->
       <section class="panel" style="padding-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px">
           <label for="user-name" style="font-size:11px;color:var(--text-muted);white-space:nowrap">你的名字</label>
@@ -28,7 +29,7 @@
         </div>
       </section>
 
-      <!-- Character Card -->
+      <!-- 角色卡管理：选择/新建/AI生成/导入，以及头像、标签、编辑操作 -->
       <section class="panel">
         <h3>角色卡 Character</h3>
         <div class="char-bar">
@@ -52,7 +53,7 @@
         </div>
       </section>
 
-      <!-- Preset management -->
+      <!-- 预设管理：保存/加载/删除完整的配置快照（system prompt、参数、模型等） -->
       <section class="panel">
         <h3>Preset 预设</h3>
         <div class="preset-bar">
@@ -62,7 +63,7 @@
         </div>
       </section>
 
-      <!-- System prompt -->
+      <!-- 系统提示词：定义AI行为规则，附带RP/对话/无格式三种输出格式选择 -->
       <section class="panel">
         <h3>System Prompt</h3>
         <textarea id="system-prompt" rows="8" placeholder="设定角色、场景、规则..."></textarea>
@@ -76,7 +77,7 @@
         </div>
       </section>
 
-      <!-- World Books -->
+      <!-- 世界书：按关键词触发注入上下文的知识条目，支持新建/导入/编辑 -->
       <section class="panel">
         <h3>世界书 Lorebook</h3>
         <div class="wb-toolbar">
@@ -87,7 +88,7 @@
         <div id="wb-list" class="wb-list"></div>
       </section>
 
-      <!-- Model selection -->
+      <!-- 模型选择：可多选，支持搜索和按审核状态过滤 -->
       <section class="panel">
         <h3>模型选择</h3>
         <input type="text" id="model-search" placeholder="搜索模型...">
@@ -105,7 +106,7 @@
         </div>
       </section>
 
-      <!-- TTS Voice -->
+      <!-- TTS 语音：选择音色和语速，用于朗读AI回复 -->
       <section class="panel">
         <h3>语音朗读 TTS</h3>
         <div class="char-field" style="margin-bottom:6px">
@@ -125,7 +126,7 @@
         </div>
       </section>
 
-      <!-- Parameters -->
+      <!-- 生成参数：Temperature/TopP/MaxTokens/频率惩罚/存在惩罚 -->
       <section class="panel">
         <h3>参数调节</h3>
         <div class="param-group">
@@ -151,7 +152,7 @@
       </section>
     </aside>
 
-    <!-- Right: chat area -->
+    <!-- 聊天区域：每个选中的模型各占一列并行对话，底部为消息输入栏 -->
     <main class="chat-area">
       <div id="chat-columns" class="chat-columns">
         <div class="placeholder-msg">← 选择模型后开始对话</div>

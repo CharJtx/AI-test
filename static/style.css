@@ -1,5 +1,10 @@
+/* 全局重置 */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* 主题色彩变量 —— 深色 GitHub 风格配色方案
+   bg/surface/surface2: 三层深色背景，由深到浅
+   accent: 蓝色强调色，用于链接、选中态、主按钮
+   danger/success: 语义色，用于删除操作和免费/无审核标记 */
 :root {
   --bg: #0d1117;
   --surface: #161b22;
@@ -23,7 +28,7 @@ html, body {
   line-height: 1.5;
 }
 
-/* ── Header ─────────────────────────────────────────── */
+/* ── Header · 顶部导航栏 ─────────────────────────────── */
 header {
   display: flex;
   align-items: center;
@@ -56,14 +61,14 @@ header h1 {
   border-color: var(--danger);
 }
 
-/* ── Layout ─────────────────────────────────────────── */
+/* ── Layout · 页面主体：侧栏 + 聊天区的 flex 横向布局 ── */
 .layout {
   display: flex;
   height: calc(100vh - 53px);
   overflow: hidden;
 }
 
-/* ── Sidebar ────────────────────────────────────────── */
+/* ── Sidebar · 左侧配置面板（固定宽度，纵向滚动） ──── */
 .sidebar {
   width: 340px;
   min-width: 340px;
@@ -105,7 +110,7 @@ header h1 {
   border-color: var(--accent);
 }
 
-/* ── Character Card ──────────────────────────────────── */
+/* ── Character Card · 角色卡选择栏、信息展示、标签与操作按钮 ── */
 .char-bar {
   display: flex;
   gap: 6px;
@@ -180,7 +185,7 @@ header h1 {
   color: var(--accent);
 }
 
-/* Character Editor Dialog */
+/* 角色编辑器弹窗：多字段表单，纵向可滚动 */
 .dialog.char-editor {
   min-width: 580px;
   max-width: 720px;
@@ -230,7 +235,7 @@ header h1 {
   margin-top: 2px;
 }
 
-/* Preset bar */
+/* 预设栏：下拉选择 + 保存/删除按钮 */
 .preset-bar {
   display: flex;
   gap: 6px;
@@ -248,7 +253,7 @@ header h1 {
 }
 .preset-bar button:hover { border-color: var(--accent); }
 
-/* RP format toggle */
+/* RP 输出格式切换（RP格式/纯对话/无格式） */
 .rp-format-toggle {
   display: flex;
   align-items: center;
@@ -256,7 +261,7 @@ header h1 {
   margin-top: 6px;
 }
 
-/* ── World Books ─────────────────────────────────────── */
+/* ── World Books · 世界书列表与条目卡片 ──────────────── */
 .wb-toolbar {
   display: flex;
   gap: 6px;
@@ -334,7 +339,7 @@ header h1 {
 .wb-card-actions button:hover { color: var(--accent); }
 .wb-card-actions button.danger:hover { color: var(--danger); }
 
-/* World Book Editor Dialog */
+/* 世界书编辑器弹窗：条目列表的增删改 */
 .dialog.wb-editor {
   min-width: 520px;
   max-width: 680px;
@@ -427,7 +432,7 @@ header h1 {
 }
 .wb-add-entry:hover { border-color: var(--accent); color: var(--accent); }
 
-/* Filter bar */
+/* 模型过滤栏：无审核筛选复选框 + 模型计数 */
 .filter-bar {
   display: flex;
   align-items: center;
@@ -455,7 +460,7 @@ header h1 {
   color: var(--text-muted);
 }
 
-/* Model list */
+/* 模型列表：可滚动的多选列表，含名称、元信息和状态徽章 */
 .model-list {
   max-height: 260px;
   overflow-y: auto;
@@ -565,7 +570,7 @@ header h1 {
 }
 .model-tag .remove:hover { opacity: 1; }
 
-/* Parameters */
+/* 参数调节面板：滑块和数字输入 */
 .param-group {
   margin-bottom: 10px;
 }
@@ -585,7 +590,7 @@ header h1 {
   accent-color: var(--accent);
 }
 
-/* ── Chat Area ──────────────────────────────────────── */
+/* ── Chat Area · 聊天主区域：多模型并列对话列 ────────── */
 .chat-area {
   flex: 1;
   display: flex;
@@ -677,7 +682,7 @@ header h1 {
   padding: 0;
 }
 
-/* RP formatting */
+/* RP 格式化颜色：*动作* 用紫色斜体，「对话」用橙色 */
 .rp-action {
   color: #d2a8ff;
   font-style: italic;
@@ -700,7 +705,7 @@ header h1 {
   51%, 100% { opacity: 0; }
 }
 
-/* ── Input Bar ──────────────────────────────────────── */
+/* ── Input Bar · 底部消息输入栏 ─────────────────────── */
 .input-bar {
   display: flex;
   gap: 8px;
@@ -742,13 +747,13 @@ header h1 {
   cursor: not-allowed;
 }
 
-/* ── Scrollbar ──────────────────────────────────────── */
+/* ── Scrollbar · 全局滚动条样式（细窄暗色） ──────────── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
-/* ── Dialog ──────────────────────────────────────── */
+/* ── Dialog · 模态弹窗系统：半透明遮罩 + 居中面板 ──── */
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -805,7 +810,7 @@ header h1 {
 }
 .dialog-actions button.primary:hover { background: var(--accent-hover); }
 
-/* ── Generator Tabs ── */
+/* ── Generator Tabs · AI生成器的选项卡切换 ── */
 .gen-tab {
   flex: 1; padding: 8px 0; font-size: 13px; cursor: pointer;
   background: none; border: none; border-bottom: 2px solid transparent;
@@ -815,7 +820,7 @@ header h1 {
 .gen-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .gen-tab:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Message Actions ── */
+/* ── Message Actions · 消息悬浮操作按钮（重生成/TTS等） ── */
 .msg-actions {
   display: flex; gap: 4px; margin-top: 4px; opacity: 0; transition: opacity 0.15s;
 }
@@ -828,7 +833,7 @@ header h1 {
 .msg-action-btn:hover { border-color: var(--accent); color: var(--text); }
 .msg-action-btn:disabled { opacity: 0.5; cursor: wait; }
 
-/* ── Visual Scene Hint ── */
+/* ── Visual Scene Hint · 场景图像生成提示按钮（延迟淡入） ── */
 .visual-scene-hint {
   margin-top: 6px; opacity: 0; animation: hint-fade-in 0.6s ease 0.8s forwards;
 }
@@ -843,7 +848,7 @@ header h1 {
   background: rgba(88, 166, 255, 0.05);
 }
 
-/* ── Image Prompt Popup ── */
+/* ── Image Prompt Popup · 图像提示词弹出面板（可复制的等宽文本） ── */
 .img-prompt-popup {
   margin-top: 8px; background: var(--bg); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden; font-size: 13px;
@@ -873,7 +878,7 @@ header h1 {
 }
 .img-prompt-copy:hover { background: var(--accent-hover); }
 
-/* ── Chat History List ── */
+/* ── Chat History List · 对话记录列表：加载/删除已保存的对话 ── */
 .chat-history-item {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius);
@@ -912,7 +917,7 @@ header h1 {
 }
 .chat-delete-btn:hover { border-color: var(--danger); color: var(--danger); }
 
-/* ── TTS ── */
+/* ── TTS · 语音朗读控件与播放中脉冲动画 ── */
 .tts-controls {
   display: flex; align-items: center; gap: 8px;
 }
@@ -925,7 +930,7 @@ header h1 {
   50% { opacity: 0.5; }
 }
 
-/* ── Remix Card Preview ── */
+/* ── Remix Card Preview · AI改造角色卡的预览卡片 ── */
 .remix-card-preview {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 12px; background: var(--surface); border: 1px solid var(--border);
@@ -934,7 +939,7 @@ header h1 {
 .remix-card-name { font-size: 15px; font-weight: 600; color: var(--text); }
 .remix-card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 
-/* ── Character Avatar ── */
+/* ── Character Avatar · 角色头像展示与图生提示词面板 ── */
 .char-avatar-area { margin-bottom: 8px; }
 .char-avatar-img {
   width: 100%; max-height: 260px; object-fit: cover;

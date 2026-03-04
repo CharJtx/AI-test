@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KOL Explorer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2129;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --danger: #f85149;
+      --success: #3fb950;
+      --radius: 8px;
+    }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    header a:hover { color: var(--accent); }
+
+    .config-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .config-bar button {
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .config-bar button:hover { background: var(--accent-hover); }
+    .config-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .stats-bar {
+      display: flex;
+      gap: 20px;
+      padding: 10px 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-bar .stat-val { color: var(--text); font-weight: 600; }
+
+    .container { padding: 20px 24px; }
+
+    .status-msg {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .status-msg.error { color: var(--danger); }
+
+    .kol-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+    .kol-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: border-color 0.15s;
+    }
+    .kol-card:hover { border-color: var(--accent); }
+    .kol-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .kol-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--accent);
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .kol-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .kol-name {
+      font-size: 15px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .kol-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+    .kol-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .kol-tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--surface2);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .kol-fields {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+    }
+    .kol-fields .field-label { color: var(--text-muted); }
+    .kol-fields .field-value { color: var(--text); text-align: right; }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      padding: 24px 0;
+    }
+    .pagination button {
+      padding: 8px 20px;
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pagination button:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .pagination .page-info {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .detail-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .detail-panel h2 { font-size: 18px; margin-bottom: 16px; }
+    .detail-panel .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .detail-panel .detail-row:last-child { border-bottom: none; }
+    .detail-panel .detail-key { color: var(--text-muted); }
+    .detail-panel .detail-val { color: var(--text); text-align: right; max-width: 60%; word-break: break-all; }
+    .detail-close {
+      margin-top: 16px;
+      padding: 8px 20px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .detail-close:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KOL Explorer</h1>
+    <a href="/">← 返回主页</a>
+  </header>
+
+  <div class="config-bar">
+    <button id="btn-fetch">加载 KOL</button>
+  </div>
+
+  <div class="stats-bar" id="stats-bar" style="display:none">
+    <span>当前页: <span class="stat-val" id="stat-count">0</span> 条</span>
+    <span>每页: <span class="stat-val" id="stat-page-size">20</span></span>
+    <span>页码: <span class="stat-val" id="stat-page">1</span></span>
+  </div>
+
+  <div class="container">
+    <div id="content">
+      <div class="status-msg">点击「加载 KOL」获取数据（需在 .env 中配置 INSNAP_API_URL 和 INSNAP_API_KEY）</div>
+    </div>
+    <div class="pagination" id="pagination" style="display:none">
+      <button id="btn-prev" disabled>← 上一页</button>
+      <span class="page-info" id="page-info">第 1 页</span>
+      <button id="btn-next" disabled>下一页 →</button>
+    </div>
+  </div>
+
+  <script>
+    const $btnFetch = document.getElementById("btn-fetch");
+    const $content = document.getElementById("content");
+    const $pagination = document.getElementById("pagination");
+    const $statsBar = document.getElementById("stats-bar");
+    const $btnPrev = document.getElementById("btn-prev");
+    const $btnNext = document.getElementById("btn-next");
+
+    const PAGE_SIZE = 20;
+    let cursorStack = [null];
+    let currentPage = 1;
+    let nextCursor = null;
+    let loading = false;
+
+    $btnFetch.addEventListener("click", () => {
+      cursorStack = [null];
+      currentPage = 1;
+      fetchKols(null);
+    });
+
+    $btnPrev.addEventListener("click", () => {
+      if (currentPage <= 1) return;
+      currentPage--;
+      cursorStack.pop();
+      fetchKols(cursorStack[cursorStack.length - 1]);
+    });
+
+    $btnNext.addEventListener("click", () => {
+      if (!nextCursor) return;
+      currentPage++;
+      cursorStack.push(nextCursor);
+      fetchKols(nextCursor);
+    });
+
+    async function fetchKols(cursor) {
+      if (loading) return;
+
+      loading = true;
+      $btnFetch.disabled = true;
+      $btnFetch.textContent = "加载中...";
+      $content.innerHTML = '<div class="status-msg">加载中...</div>';
+
+      const params = new URLSearchParams({ page_size: PAGE_SIZE });
+      if (cursor) params.set("cursor", cursor);
+
+      try {
+        const resp = await fetch(`/api/insnap-proxy/kols?${params}`);
+        const data = await resp.json();
+
+        if (data.error) {
+          $content.innerHTML = `<div class="status-msg error">请求失败: ${escapeHtml(data.error)}<br><small>${escapeHtml(data.detail || "")}</small></div>`;
+          $pagination.style.display = "none";
+          $statsBar.style.display = "none";
+          return;
+        }
+
+        const items = data.items || [];
+        nextCursor = data.next_cursor || null;
+
+        if (items.length === 0 && currentPage === 1) {
+          $content.innerHTML = '<div class="status-msg">没有找到任何 KOL 数据</div>';
+          $pagination.style.display = "none";
+          $statsBar.style.display = "none";
+          return;
+        }
+
+        renderKols(items);
+
+        $statsBar.style.display = "";
+        document.getElementById("stat-count").textContent = items.length;
+        document.getElementById("stat-page-size").textContent = PAGE_SIZE;
+        document.getElementById("stat-page").textContent = currentPage;
+
+        $pagination.style.display = "";
+        $btnPrev.disabled = currentPage <= 1;
+        $btnNext.disabled = !data.has_more;
+        document.getElementById("page-info").textContent = `第 ${currentPage} 页`;
+
+      } catch (e) {
+        $content.innerHTML = `<div class="status-msg error">网络错误: ${escapeHtml(e.message)}</div>`;
+      } finally {
+        loading = false;
+        $btnFetch.disabled = false;
+        $btnFetch.textContent = "加载 KOL";
+      }
+    }
+
+    function renderKols(items) {
+      $content.innerHTML = `<div class="kol-grid">${items.map(renderKolCard).join("")}</div>`;
+
+      $content.querySelectorAll(".kol-card").forEach((card, idx) => {
+        card.addEventListener("click", () => showDetail(items[idx]));
+        card.style.cursor = "pointer";
+      });
+    }
+
+    function renderKolCard(kol) {
+      const name = kol.nickname || kol.name || kol.username || `KOL #${kol.profile_id || kol.id || "?"}`;
+      const avatarContent = kol.avatar_url
+        ? `<img src="${escapeHtml(kol.avatar_url)}" alt="">`
+        : name.charAt(0).toUpperCase();
+      const id = kol.profile_id || kol.id || "";
+
+      const fields = [];
+      if (kol.platform) fields.push(["平台", kol.platform]);
+      if (kol.followers_count != null) fields.push(["粉丝", formatNum(kol.followers_count)]);
+      if (kol.posts_count != null) fields.push(["帖子", formatNum(kol.posts_count)]);
+      if (kol.engagement_rate != null) fields.push(["互动率", (kol.engagement_rate * 100).toFixed(1) + "%"]);
+      if (kol.status) fields.push(["状态", kol.status]);
+      if (kol.created_at) fields.push(["创建", formatDate(kol.created_at)]);
+
+      const tags = (kol.tags || kol.categories || []).slice(0, 4);
+
+      return `
+        <div class="kol-card">
+          <div class="kol-card-header">
+            <div class="kol-avatar">${avatarContent}</div>
+            <div>
+              <div class="kol-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+              <div class="kol-id">ID: ${escapeHtml(String(id))}</div>
+            </div>
+          </div>
+          ${tags.length > 0 ? `<div class="kol-meta">${tags.map(t => `<span class="kol-tag">${escapeHtml(String(t))}</span>`).join("")}</div>` : ""}
+          ${fields.length > 0 ? `<div class="kol-fields">${fields.map(([k, v]) => `<span class="field-label">${k}</span><span class="field-value">${escapeHtml(String(v))}</span>`).join("")}</div>` : ""}
+        </div>`;
+    }
+
+    function showDetail(kol) {
+      const overlay = document.createElement("div");
+      overlay.className = "detail-overlay";
+
+      const entries = Object.entries(kol).filter(([k, v]) => v != null && v !== "");
+      overlay.innerHTML = `
+        <div class="detail-panel">
+          <h2>${escapeHtml(kol.nickname || kol.name || kol.username || "KOL 详情")}</h2>
+          ${entries.map(([k, v]) => `
+            <div class="detail-row">
+              <span class="detail-key">${escapeHtml(k)}</span>
+              <span class="detail-val">${escapeHtml(typeof v === "object" ? JSON.stringify(v) : String(v))}</span>
+            </div>`).join("")}
+          <button class="detail-close" id="detail-close">关闭</button>
+        </div>`;
+
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+      document.getElementById("detail-close").addEventListener("click", () => overlay.remove());
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatNum(n) {
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+      if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+      return String(n);
+    }
+
+    function formatDate(d) {
+      try { return new Date(d).toLocaleDateString("zh-CN"); }
+      catch { return d; }
+    }
+  </script>
+</body>
+</html>
