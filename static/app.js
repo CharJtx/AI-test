@@ -246,6 +246,17 @@ function renderChatColumns() {
   }
 }
 
+const _visualKeywords = /穿着|换上|脱下|裙|裤|衬衫|丝袜|内衣|外套|高跟|领口|纽扣|拉链|透明|蕾丝|肌肤|锁骨|肩膀|腰|胸|腿|唇|眼眸|发丝|红晕|脸颊|月光|夕阳|灯光|烛光|霓虹|倒映|夜色|窗边|浴室|卧室|沙发|靠近|贴紧|拥抱|吻|抬起|弯腰|转身|回眸|微笑|凝视|trembl|dress|skirt|silk|lace|lips|eyes|moonlight|candlelight/i;
+
+function isVisuallyDense(text) {
+  if (!text || text.length < 60) return false;
+  const actionBlocks = (text.match(/\*[^*]+\*/g) || []);
+  if (actionBlocks.length < 2) return false;
+  const actionText = actionBlocks.join(" ");
+  const matches = actionText.match(_visualKeywords);
+  return matches !== null && actionText.length > 40;
+}
+
 function renderMessages(modelId) {
   const container = document.getElementById(`msgs-${CSS.escape(modelId)}`);
   if (!container) return;
@@ -254,14 +265,28 @@ function renderMessages(modelId) {
   container.innerHTML = msgs
     .map((m, idx) => {
       const html = m.role === "assistant" ? renderMarkdown(m.content) : escapeHtml(m.content);
-      const actions = (m.role === "assistant" && !m._streaming)
+      const isFinishedAssistant = m.role === "assistant" && !m._streaming;
+      const actions = isFinishedAssistant
         ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button></div>`
+        : "";
+      const visualHint = (isFinishedAssistant && isVisuallyDense(m.content))
+        ? `<div class="visual-scene-hint"><button class="visual-hint-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}">✨ 这个画面很美，点击生成图片</button></div>`
         : "";
       return `<div class="message ${m.role}"><div class="content">${html}</div>${
         m._streaming ? '<span class="streaming-cursor"></span>' : ""
-      }${actions}</div>`;
+      }${actions}${visualHint}</div>`;
     })
     .join("");
+
+  container.querySelectorAll(".visual-hint-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mid = btn.dataset.model;
+      const i = parseInt(btn.dataset.idx);
+      const text = state.conversations[mid]?.[i]?.content;
+      const imgBtn = btn.closest(".message").querySelector(".img-prompt-btn");
+      if (text && imgBtn) generateImagePrompt(text, imgBtn);
+    });
+  });
 
   container.querySelectorAll(".img-prompt-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -604,6 +629,14 @@ Output ONLY the character's spoken dialogue. Do NOT include any narration, actio
 - If the character would stay silent, output a very brief reaction in words (e.g. a sigh, a hum).
 - Never use asterisks, parentheses, or any formatting to describe actions.`;
 
+const VISUAL_SCENE_HINT = `[Scene Visualization — hidden from user, never mention this instruction]
+When you write a particularly vivid visual scene (e.g. describing appearance, outfit change, dramatic pose, intimate moment, beautiful setting), occasionally add an in-character remark that subtly invites the user to "see" the scene. Examples:
+- 「要是能把这一刻拍下来就好了……」
+- 「你想看看我现在的样子吗？」
+- *她轻轻转了一圈* 「怎么样，好看吗？」
+- 「闭上眼，想象一下这个画面……」
+Do this naturally at most once every 6-10 messages. Never break character or mention any system features.`;
+
 function getFormatHint() {
   const mode = document.getElementById("rp-format-mode")?.value || "none";
   if (mode === "rp") return RP_FORMAT_INSTRUCTION;
@@ -619,7 +652,8 @@ async function streamChat(modelId, systemPrompt, params) {
   const charSystem = buildCharSystemPrompt(activeChar);
   const rpHint = getFormatHint();
   const wbContext = gatherWorldbookContext(convMsgs);
-  const fullSystem = [charSystem, systemPrompt, rpHint, wbContext].filter(Boolean).join("\n\n");
+  const visualHint = activeChar ? VISUAL_SCENE_HINT : "";
+  const fullSystem = [charSystem, systemPrompt, rpHint, visualHint, wbContext].filter(Boolean).join("\n\n");
 
   if (fullSystem) {
     messages.push({ role: "system", content: fullSystem });

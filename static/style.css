@@ -828,6 +828,21 @@ header h1 {
 .msg-action-btn:hover { border-color: var(--accent); color: var(--text); }
 .msg-action-btn:disabled { opacity: 0.5; cursor: wait; }
 
+/* ── Visual Scene Hint ── */
+.visual-scene-hint {
+  margin-top: 6px; opacity: 0; animation: hint-fade-in 0.6s ease 0.8s forwards;
+}
+@keyframes hint-fade-in { to { opacity: 1; } }
+.visual-hint-btn {
+  background: none; border: 1px dashed var(--border); border-radius: 6px;
+  padding: 5px 14px; font-size: 12px; color: var(--text-muted); cursor: pointer;
+  transition: all 0.2s; width: 100%; text-align: center;
+}
+.visual-hint-btn:hover {
+  border-color: var(--accent); color: var(--accent); border-style: solid;
+  background: rgba(88, 166, 255, 0.05);
+}
+
 /* ── Image Prompt Popup ── */
 .img-prompt-popup {
   margin-top: 8px; background: var(--bg); border: 1px solid var(--border);

@@ -499,7 +499,8 @@ Rules:
 5. The prompt MUST be styled as realistic photography. Always include: "photorealistic portrait, realistic photograph, studio lighting, cinematic composition, professional photography, clear translucent skin texture, natural skin pores, shot on Canon EOS R5, 85mm lens, shallow depth of field, bokeh background"
 6. Include quality boosters: "masterpiece, best quality, highly detailed, 8k uhd, RAW photo"
 7. Keep the prompt between 60-150 words.
-8. If intimate traits are mentioned, describe them artistically focusing on expression and body language."""
+8. If intimate traits are mentioned, describe them artistically focusing on expression and body language.
+9. STRICT CONTENT POLICY: The prompt must NEVER depict exposed genitalia, nipples, or fully nude bodies. Use clothing, strategic angles, fabric draping, shadows, or cropping to keep the image tasteful. Always ensure the character wears at least minimal clothing (lingerie, towel, sheet, etc.)."""
 
 AVATAR_REMIX_PROMPT_SYSTEM = """You are an expert at modifying character portrait prompts for AI image generators.
 
@@ -514,7 +515,8 @@ Rules:
 2. Write in ENGLISH regardless of input language.
 3. Naturally merge the changes into the existing prompt, don't just append.
 4. Keep the same photorealistic portrait style and quality tags.
-5. Keep the prompt between 60-150 words."""
+5. Keep the prompt between 60-150 words.
+6. STRICT CONTENT POLICY: NEVER include exposed genitalia, nipples, or full nudity. Use clothing, angles, fabric, or shadows to keep it tasteful."""
 
 
 async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
@@ -592,7 +594,8 @@ Rules:
 5. The prompt MUST be styled as realistic photography. Always include these realism tags: "photorealistic, realistic photograph, real environment, cinematic composition, professional lighting, sharp background with rich details, clear translucent skin texture, natural skin pores, shot on Canon EOS R5, 85mm lens, shallow depth of field"
 6. Include quality boosters at the end: "masterpiece, best quality, highly detailed, 8k uhd, RAW photo"
 7. If the scene is intimate/erotic, describe it artistically using body positioning, expressions, and atmosphere rather than crude terms.
-8. Keep the prompt between 80-200 words."""
+8. STRICT CONTENT POLICY: The prompt must NEVER depict exposed genitalia, nipples, or fully nude bodies. Use clothing, strategic angles, fabric draping, shadows, or cropping to keep the image tasteful. Always ensure characters wear at least minimal clothing (lingerie, towel, sheet, etc.).
+9. Keep the prompt between 80-200 words."""
 
 
 @app.post("/api/image-prompt")
