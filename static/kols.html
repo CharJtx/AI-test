@@ -3,353 +3,94 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KOL Explorer</title>
+  <title>KOL Outfit Explorer</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --surface2: #1c2129;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent: #58a6ff;
-      --accent-hover: #79b8ff;
-      --danger: #f85149;
-      --success: #3fb950;
-      --radius: 8px;
-    }
-    html, body {
-      height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 24px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-    }
-    header h1 { font-size: 18px; font-weight: 600; }
-    header a {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 13px;
-    }
-    header a:hover { color: var(--accent); }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2129;--border:#30363d;--text:#e6edf3;--text-muted:#8b949e;--accent:#58a6ff;--accent-hover:#79b8ff;--danger:#f85149;--success:#3fb950;--warning:#d29922;--radius:8px}
+    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
 
-    .config-bar {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      padding: 14px 24px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .config-bar button {
-      padding: 6px 16px;
-      font-size: 13px;
-      font-weight: 500;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .config-bar button:hover { background: var(--accent-hover); }
-    .config-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface)}
+    header h1{font-size:18px;font-weight:600}
+    header a{color:var(--text-muted);text-decoration:none;font-size:13px}
+    header a:hover{color:var(--accent)}
 
-    .stats-bar {
-      display: flex;
-      gap: 20px;
-      padding: 10px 24px;
-      font-size: 12px;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .stats-bar .stat-val { color: var(--text); font-weight: 600; }
+    .toolbar{display:flex;gap:10px;align-items:center;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .toolbar button{padding:6px 16px;font-size:13px;font-weight:500;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;transition:background .15s}
+    .toolbar button:hover{background:var(--accent-hover)}
+    .toolbar button:disabled{opacity:.5;cursor:not-allowed}
+    .toolbar button.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .toolbar button.secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .toolbar button.batch{background:#2ea043;color:#fff}
+    .toolbar button.batch:hover{background:#3fb950}
+    .toolbar .spacer{flex:1}
+    .toolbar .info{font-size:12px;color:var(--text-muted)}
 
-    .container { padding: 20px 24px; }
+    .container{padding:20px 24px}
+    .status-msg{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:14px}
+    .status-msg.error{color:var(--danger)}
 
-    .status-msg {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--text-muted);
-      font-size: 14px;
-    }
-    .status-msg.error { color: var(--danger); }
+    .outfit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+    .outfit-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .15s}
+    .outfit-card:hover{border-color:var(--accent)}
+    .outfit-card.has-char{border-left:3px solid var(--success)}
+    .outfit-img{width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--surface2);display:block}
+    .outfit-img-placeholder{width:100%;aspect-ratio:3/4;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px}
+    .outfit-info{padding:12px}
+    .outfit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .outfit-kol-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .outfit-code{font-size:11px;color:var(--text-muted);font-family:monospace}
+    .outfit-badges{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+    .outfit-badge{font-size:10px;padding:1px 6px;border-radius:8px;background:var(--surface2);color:var(--text-muted);border:1px solid var(--border)}
 
-    .kol-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 14px;
-    }
-    .kol-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      transition: border-color 0.15s;
-    }
-    .kol-card:hover { border-color: var(--accent); }
-    .kol-card-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    .kol-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: var(--surface2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      color: var(--accent);
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-    .kol-avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .kol-name {
-      font-size: 15px;
-      font-weight: 600;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .kol-id {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-family: monospace;
-    }
-    .kol-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .kol-tag {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      background: var(--surface2);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-    }
-    .kol-fields {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--text-muted);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 12px;
-    }
-    .kol-fields .field-label { color: var(--text-muted); }
-    .kol-fields .field-value { color: var(--text); text-align: right; }
+    .gen-section{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+    .gen-row{display:flex;gap:6px;align-items:center}
+    .gen-input{flex:1;padding:5px 8px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);outline:none}
+    .gen-input:focus{border-color:var(--accent)}
+    .gen-btn{padding:5px 12px;font-size:12px;font-weight:500;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;white-space:nowrap}
+    .gen-btn:hover{background:var(--accent-hover)}
+    .gen-btn:disabled{opacity:.5;cursor:not-allowed}
+    .gen-btn.revise{background:var(--warning);color:#000}
+    .gen-btn.revise:hover{background:#e3a831}
 
-    .pagination {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 14px;
-      padding: 24px 0;
-    }
-    .pagination button {
-      padding: 8px 20px;
-      font-size: 13px;
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .pagination button:hover:not(:disabled) {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-    .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
-    .pagination .page-info {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
+    .char-result{margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;max-height:500px;overflow-y:auto}
+    .char-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;position:sticky;top:0;background:var(--bg);z-index:1;padding-bottom:4px}
+    .char-result-name{font-size:14px;font-weight:600;color:var(--accent)}
+    .char-version-select{padding:2px 6px;font-size:11px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px}
+    .char-field{margin-top:4px}
+    .char-field-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;position:sticky;top:28px;background:var(--bg);z-index:1;padding:2px 0}
+    .char-field-value{color:var(--text);margin-top:1px;word-break:break-word;white-space:pre-wrap}
+    .char-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .char-tag{font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(88,166,255,.15);color:var(--accent)}
 
-    .detail-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-    }
-    .detail-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 600px;
-      width: 90%;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .detail-panel h2 { font-size: 18px; margin-bottom: 16px; }
-    .detail-panel .detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 13px;
-    }
-    .detail-panel .detail-row:last-child { border-bottom: none; }
-    .detail-panel .detail-key { color: var(--text-muted); }
-    .detail-panel .detail-val { color: var(--text); text-align: right; max-width: 60%; word-break: break-all; }
-    .detail-close {
-      margin-top: 16px;
-      padding: 8px 20px;
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .detail-close:hover { border-color: var(--accent); }
+    .revise-row{display:flex;gap:6px;align-items:center;margin-top:8px}
 
-    /* Discovery */
-    .discovery-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .discovery-header h2 { font-size: 16px; font-weight: 600; }
-    .discovery-header .discovery-meta { font-size: 12px; color: var(--text-muted); }
-    .discovery-perms {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 16px;
-    }
-    .discovery-perms .perm-tag {
-      font-size: 11px;
-      padding: 3px 10px;
-      border-radius: 12px;
-      background: rgba(63,185,80,0.15);
-      color: var(--success);
-      border: 1px solid rgba(63,185,80,0.3);
-      font-family: monospace;
-    }
-    .endpoint-list { display: flex; flex-direction: column; gap: 10px; }
-    .endpoint-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-      cursor: pointer;
-      transition: border-color 0.15s;
-    }
-    .endpoint-card:hover { border-color: var(--accent); }
-    .endpoint-card-head {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 6px;
-    }
-    .endpoint-method {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: monospace;
-      background: rgba(88,166,255,0.15);
-      color: var(--accent);
-    }
-    .endpoint-path { font-size: 14px; font-family: monospace; font-weight: 500; }
-    .endpoint-summary { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
-    .endpoint-perm {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-family: monospace;
-    }
-    .endpoint-details {
-      display: none;
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-    .endpoint-details.open { display: block; }
-    .endpoint-details h4 {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin: 10px 0 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .endpoint-details h4:first-child { margin-top: 0; }
-    .param-table {
-      width: 100%;
-      font-size: 12px;
-      border-collapse: collapse;
-    }
-    .param-table th {
-      text-align: left;
-      padding: 4px 8px;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-      font-weight: 500;
-    }
-    .param-table td {
-      padding: 4px 8px;
-      border-bottom: 1px solid var(--border);
-    }
-    .param-table .param-name { font-family: monospace; color: var(--accent); }
-    .param-table .param-required { color: var(--danger); font-size: 10px; }
-    .resp-field { font-size: 12px; font-family: monospace; color: var(--text-muted); padding: 2px 0; }
-    .discovery-section-divider {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 20px 0;
-    }
+    .pagination{display:flex;justify-content:center;align-items:center;gap:14px;padding:24px 0}
+    .pagination button{padding:8px 20px;font-size:13px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer}
+    .pagination button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+    .pagination button:disabled{opacity:.3;cursor:not-allowed}
+    .pagination .page-info{font-size:13px;color:var(--text-muted)}
+
+    .generating-indicator{display:inline-block;font-size:11px;color:var(--warning);margin-left:6px}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .generating-indicator.active{animation:pulse 1.2s infinite}
   </style>
 </head>
 <body>
   <header>
-    <h1>KOL Explorer</h1>
+    <h1>KOL Outfit Explorer</h1>
     <a href="/">← 返回主页</a>
   </header>
 
-  <div class="config-bar">
-    <button id="btn-discovery">Discovery</button>
-    <button id="btn-fetch">加载 KOL</button>
-  </div>
-
-  <div id="discovery-section" style="display:none">
-    <div class="container" id="discovery-content"></div>
-  </div>
-
-  <div class="stats-bar" id="stats-bar" style="display:none">
-    <span>当前页: <span class="stat-val" id="stat-count">0</span> 条</span>
-    <span>每页: <span class="stat-val" id="stat-page-size">20</span></span>
-    <span>页码: <span class="stat-val" id="stat-page">1</span></span>
+  <div class="toolbar">
+    <button id="btn-fetch">加载 KOL + Outfits</button>
+    <button id="btn-batch" class="batch" disabled>⚡ 一键生成全部未生成</button>
+    <span class="spacer"></span>
+    <span class="info" id="toolbar-info"></span>
   </div>
 
   <div class="container">
     <div id="content">
-      <div class="status-msg">点击「Discovery」查看 API 端点，或「加载 KOL」获取数据</div>
+      <div class="status-msg">点击「加载 KOL + Outfits」开始</div>
     </div>
     <div class="pagination" id="pagination" style="display:none">
       <button id="btn-prev" disabled>← 上一页</button>
@@ -358,266 +99,336 @@
     </div>
   </div>
 
-  <script>
-    const $btnDiscovery = document.getElementById("btn-discovery");
-    const $discoverySection = document.getElementById("discovery-section");
-    const $discoveryContent = document.getElementById("discovery-content");
-    const $btnFetch = document.getElementById("btn-fetch");
-    const $content = document.getElementById("content");
-    const $pagination = document.getElementById("pagination");
-    const $statsBar = document.getElementById("stats-bar");
-    const $btnPrev = document.getElementById("btn-prev");
-    const $btnNext = document.getElementById("btn-next");
+<script>
+const $ = id => document.getElementById(id);
+const $content = $("content");
+const $pagination = $("pagination");
+const $btnFetch = $("btn-fetch");
+const $btnBatch = $("btn-batch");
+const $btnPrev = $("btn-prev");
+const $btnNext = $("btn-next");
+const $toolbarInfo = $("toolbar-info");
 
-    const PAGE_SIZE = 20;
-    let cursorStack = [null];
-    let currentPage = 1;
-    let nextCursor = null;
-    let loading = false;
+const PAGE_SIZE = 10;
+let cursorStack = [null];
+let currentPage = 1;
+let nextCursor = null;
+let loading = false;
 
-    $btnDiscovery.addEventListener("click", fetchDiscovery);
+let outfitCards = [];
+let charMap = {};
 
-    $btnFetch.addEventListener("click", () => {
-      cursorStack = [null];
-      currentPage = 1;
-      fetchKols(null);
-    });
+$btnFetch.addEventListener("click", () => { cursorStack=[null]; currentPage=1; fetchPage(null); });
+$btnPrev.addEventListener("click", () => { if(currentPage<=1)return; currentPage--; cursorStack.pop(); fetchPage(cursorStack[cursorStack.length-1]); });
+$btnNext.addEventListener("click", () => { if(!nextCursor)return; currentPage++; cursorStack.push(nextCursor); fetchPage(nextCursor); });
+$btnBatch.addEventListener("click", batchGenerate);
 
-    $btnPrev.addEventListener("click", () => {
-      if (currentPage <= 1) return;
-      currentPage--;
-      cursorStack.pop();
-      fetchKols(cursorStack[cursorStack.length - 1]);
-    });
+async function fetchPage(cursor) {
+  if (loading) return;
+  loading = true;
+  $btnFetch.disabled = true;
+  $btnFetch.textContent = "加载中...";
+  $content.innerHTML = '<div class="status-msg">加载 KOL 列表...</div>';
 
-    $btnNext.addEventListener("click", () => {
-      if (!nextCursor) return;
-      currentPage++;
-      cursorStack.push(nextCursor);
-      fetchKols(nextCursor);
-    });
+  const params = new URLSearchParams({page_size: PAGE_SIZE});
+  if (cursor) params.set("cursor", cursor);
 
-    async function fetchDiscovery() {
-      $btnDiscovery.disabled = true;
-      $btnDiscovery.textContent = "加载中...";
+  try {
+    const resp = await fetch(`/api/insnap-proxy/kols?${params}`);
+    const data = await resp.json();
+    if (data.error) { showError(data.error, data.detail); return; }
 
-      try {
-        const resp = await fetch("/api/insnap-proxy/discovery");
-        const data = await resp.json();
+    const kols = data.items || [];
+    nextCursor = data.next_cursor || null;
+    if (kols.length === 0 && currentPage === 1) { $content.innerHTML = '<div class="status-msg">没有 KOL 数据</div>'; return; }
 
-        if (data.error) {
-          $discoverySection.style.display = "";
-          $discoveryContent.innerHTML = `<div class="status-msg error">Discovery 失败: ${escapeHtml(data.error)}<br><small>${escapeHtml(data.detail || "")}</small></div>`;
-          return;
-        }
+    $content.innerHTML = '<div class="status-msg">加载 Outfits 中...</div>';
 
-        renderDiscovery(data);
-        $discoverySection.style.display = "";
-      } catch (e) {
-        $discoverySection.style.display = "";
-        $discoveryContent.innerHTML = `<div class="status-msg error">网络错误: ${escapeHtml(e.message)}</div>`;
-      } finally {
-        $btnDiscovery.disabled = false;
-        $btnDiscovery.textContent = "Discovery";
-      }
+    const charResp = await fetch("/api/kol-characters");
+    const charData = await charResp.json();
+    charMap = {};
+    for (const item of (charData.items || [])) {
+      charMap[item.key] = item;
     }
 
-    function renderDiscovery(data) {
-      const perms = data.active_permissions || [];
-      const endpoints = data.endpoints || [];
-      const version = data.api_version || "?";
+    outfitCards = [];
+    const outfitPromises = kols.map(async kol => {
+      const name = kol.name_override || kol.kol_name || `KOL #${kol.profile_id}`;
+      try {
+        const oResp = await fetch(`/api/insnap-proxy/kols/${kol.profile_id}/outfits`);
+        const oData = await oResp.json();
+        if (oData.error || !oData.items) return [];
+        return oData.items.map(o => ({
+          profile_id: kol.profile_id,
+          kol_name: name,
+          avatar: kol.avatar,
+          outfit_code: o.code,
+          usage_types: o.usage_types || [],
+          basic_image: o.basic_image,
+          basic_video: o.basic_video,
+          key: `${kol.profile_id}:${o.code}`,
+        }));
+      } catch { return []; }
+    });
 
-      $discoveryContent.innerHTML = `
-        <div class="discovery-header">
-          <h2>API Discovery</h2>
-          <span class="discovery-meta">版本: ${escapeHtml(version)} · ${endpoints.length} 个端点</span>
+    const results = await Promise.all(outfitPromises);
+    outfitCards = results.flat();
+
+    renderOutfits();
+
+    $pagination.style.display = "";
+    $btnPrev.disabled = currentPage <= 1;
+    $btnNext.disabled = !data.has_more;
+    $("page-info").textContent = `第 ${currentPage} 页`;
+
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    loading = false;
+    $btnFetch.disabled = false;
+    $btnFetch.textContent = "加载 KOL + Outfits";
+  }
+}
+
+function showError(msg, detail) {
+  $content.innerHTML = `<div class="status-msg error">错误: ${esc(msg)}<br><small>${esc(detail||"")}</small></div>`;
+  $pagination.style.display = "none";
+}
+
+function renderOutfits() {
+  const ungenCount = outfitCards.filter(c => !charMap[c.key]).length;
+  $toolbarInfo.textContent = `${outfitCards.length} 个 Outfit · ${outfitCards.length - ungenCount} 已生成 · ${ungenCount} 未生成`;
+  $btnBatch.disabled = ungenCount === 0;
+
+  $content.innerHTML = `<div class="outfit-grid">${outfitCards.map(renderCard).join("")}</div>`;
+  bindCardEvents();
+}
+
+function renderCard(card) {
+  const ch = charMap[card.key];
+  const hasChar = !!ch;
+  const imgHtml = card.basic_image
+    ? `<img class="outfit-img" src="${esc(card.basic_image)}" alt="" loading="lazy">`
+    : `<div class="outfit-img-placeholder">无图片</div>`;
+
+  let charHtml = "";
+  if (hasChar && ch.versions.length > 0) {
+    const latest = ch.versions[ch.versions.length - 1];
+    const d = latest.data;
+    charHtml = `
+      <div class="char-result" data-key="${esc(card.key)}">
+        <div class="char-result-header">
+          <span class="char-result-name">${esc(d.name || "未命名")}</span>
+          <select class="char-version-select" data-key="${esc(card.key)}">
+            ${ch.versions.map(v => `<option value="${v.version}" ${v.version===latest.version?"selected":""}">v${v.version}</option>`).join("")}
+          </select>
         </div>
-        ${perms.length > 0 ? `
-          <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">当前 Key 拥有的权限:</div>
-          <div class="discovery-perms">${perms.map(p => `<span class="perm-tag">${escapeHtml(p)}</span>`).join("")}</div>
-        ` : ""}
-        ${data.pagination_note ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">${escapeHtml(data.pagination_note)}</div>` : ""}
-        <div class="endpoint-list">${endpoints.map(renderEndpointCard).join("")}</div>
-        <hr class="discovery-section-divider">
-      `;
+        ${renderCharFields(d)}
+        <div class="revise-row">
+          <input class="gen-input revise-input" data-key="${esc(card.key)}" placeholder="修改指令（如：性格更冷酷）">
+          <button class="gen-btn revise revise-btn" data-key="${esc(card.key)}">AI 修改</button>
+        </div>
+      </div>`;
+  }
 
-      $discoveryContent.querySelectorAll(".endpoint-card").forEach(card => {
-        card.addEventListener("click", () => {
-          const details = card.querySelector(".endpoint-details");
-          if (details) details.classList.toggle("open");
-        });
-      });
-    }
-
-    function renderEndpointCard(ep) {
-      const params = ep.params || [];
-      const fields = ep.response_fields || [];
-      const addPerms = ep.additional_permissions || [];
-
-      let detailsHtml = "";
-      if (params.length > 0) {
-        detailsHtml += `<h4>Parameters</h4>
-          <table class="param-table">
-            <tr><th>Name</th><th>Type</th><th>Default</th><th>Description</th></tr>
-            ${params.map(p => `<tr>
-              <td><span class="param-name">${escapeHtml(p.name)}</span>${p.required ? ' <span class="param-required">required</span>' : ""}</td>
-              <td>${escapeHtml(p.type || "")}</td>
-              <td>${p.default != null ? escapeHtml(String(p.default)) : "-"}</td>
-              <td>${escapeHtml(p.description || "")}</td>
-            </tr>`).join("")}
-          </table>`;
-      }
-      if (fields.length > 0) {
-        detailsHtml += `<h4>Response Fields</h4>
-          ${fields.map(f => `<div class="resp-field">${escapeHtml(f.name)} <span style="color:var(--text-muted)">(${escapeHtml(f.type || "")})</span> ${f.description ? "— " + escapeHtml(f.description) : ""}</div>`).join("")}`;
-      }
-
-      return `
-        <div class="endpoint-card">
-          <div class="endpoint-card-head">
-            <span class="endpoint-method">${escapeHtml(ep.method || "GET")}</span>
-            <span class="endpoint-path">${escapeHtml(ep.path || "")}</span>
+  return `
+    <div class="outfit-card ${hasChar?"has-char":""}" data-key="${esc(card.key)}">
+      ${imgHtml}
+      <div class="outfit-info">
+        <div class="outfit-header">
+          <span class="outfit-kol-name">${esc(card.kol_name)}</span>
+          <span class="outfit-code">${esc(card.outfit_code)}</span>
+        </div>
+        ${card.usage_types.length > 0 ? `<div class="outfit-badges">${card.usage_types.map(t=>`<span class="outfit-badge">${esc(t)}</span>`).join("")}</div>` : ""}
+        <div class="gen-section">
+          <div class="gen-row">
+            <input class="gen-input extra-input" data-key="${esc(card.key)}" placeholder="补充设定（可选）">
+            <button class="gen-btn generate-btn" data-key="${esc(card.key)}">${hasChar?"重新生成":"生成角色卡"}</button>
           </div>
-          <div class="endpoint-summary">${escapeHtml(ep.summary || ep.description || "")}</div>
-          <div class="endpoint-perm">
-            🔑 ${escapeHtml(ep.permission || "")}
-            ${addPerms.length > 0 ? " + " + addPerms.map(p => escapeHtml(p)).join(", ") : ""}
-            ${ep.response_type ? ` · 📦 ${escapeHtml(ep.response_type)}` : ""}
-          </div>
-          ${detailsHtml ? `<div class="endpoint-details">${detailsHtml}</div>` : ""}
-        </div>`;
+        </div>
+        ${charHtml}
+      </div>
+    </div>`;
+}
+
+function renderCharFields(d) {
+  const fields = [
+    ["性格", d.personality],
+    ["场景", d.scenario],
+    ["描述", d.description],
+    ["开场白", d.first_mes],
+  ];
+  let html = "";
+  if (d.tags && d.tags.length > 0) {
+    html += `<div class="char-tags">${d.tags.map(t=>`<span class="char-tag">${esc(t)}</span>`).join("")}</div>`;
+  }
+  for (const [label, val] of fields) {
+    if (!val) continue;
+    html += `<div class="char-field"><div class="char-field-label">${label}</div><div class="char-field-value">${esc(val)}</div></div>`;
+  }
+  return html;
+}
+
+function bindCardEvents() {
+  document.querySelectorAll(".generate-btn").forEach(btn => {
+    btn.addEventListener("click", () => generateOne(btn.dataset.key));
+  });
+  document.querySelectorAll(".revise-btn").forEach(btn => {
+    btn.addEventListener("click", () => reviseOne(btn.dataset.key));
+  });
+  document.querySelectorAll(".char-version-select").forEach(sel => {
+    sel.addEventListener("change", () => switchVersion(sel.dataset.key, parseInt(sel.value)));
+  });
+}
+
+async function generateOne(key) {
+  const card = outfitCards.find(c => c.key === key);
+  if (!card) return;
+
+  const btn = document.querySelector(`.generate-btn[data-key="${CSS.escape(key)}"]`);
+  const input = document.querySelector(`.extra-input[data-key="${CSS.escape(key)}"]`);
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.textContent = "生成中...";
+
+  try {
+    const resp = await fetch("/api/kol-characters/generate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        profile_id: card.profile_id,
+        outfit_code: card.outfit_code,
+        image_url: card.basic_image,
+        kol_name: card.kol_name,
+        extra: input?.value || "",
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      alert("生成失败: " + data.error);
+      return;
     }
+    charMap[key] = data.item;
+    renderOutfits();
+  } catch (e) {
+    alert("请求失败: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "生成角色卡";
+  }
+}
 
-    async function fetchKols(cursor) {
-      if (loading) return;
+async function reviseOne(key) {
+  const input = document.querySelector(`.revise-input[data-key="${CSS.escape(key)}"]`);
+  const btn = document.querySelector(`.revise-btn[data-key="${CSS.escape(key)}"]`);
+  if (!input || !btn) return;
 
-      loading = true;
-      $btnFetch.disabled = true;
-      $btnFetch.textContent = "加载中...";
-      $content.innerHTML = '<div class="status-msg">加载中...</div>';
+  const instructions = input.value.trim();
+  if (!instructions) { alert("请输入修改指令"); return; }
 
-      const params = new URLSearchParams({ page_size: PAGE_SIZE });
-      if (cursor) params.set("cursor", cursor);
+  btn.disabled = true;
+  btn.textContent = "修改中...";
 
+  try {
+    const resp = await fetch("/api/kol-characters/revise", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ key, instructions }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      alert("修改失败: " + data.error);
+      return;
+    }
+    charMap[key] = data.item;
+    input.value = "";
+    renderOutfits();
+  } catch (e) {
+    alert("请求失败: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "AI 修改";
+  }
+}
+
+function switchVersion(key, version) {
+  const ch = charMap[key];
+  if (!ch) return;
+
+  const ver = ch.versions.find(v => v.version === version);
+  if (!ver) return;
+
+  const container = document.querySelector(`.char-result[data-key="${CSS.escape(key)}"]`);
+  if (!container) return;
+
+  const d = ver.data;
+  const nameEl = container.querySelector(".char-result-name");
+  if (nameEl) nameEl.textContent = d.name || "未命名";
+
+  const fieldsArea = container.querySelectorAll(".char-field");
+  fieldsArea.forEach(el => el.remove());
+  const tagsArea = container.querySelector(".char-tags");
+  if (tagsArea) tagsArea.remove();
+
+  const reviseRow = container.querySelector(".revise-row");
+  const frag = document.createElement("div");
+  frag.innerHTML = renderCharFields(d);
+  while (frag.firstChild) {
+    container.insertBefore(frag.firstChild, reviseRow);
+  }
+}
+
+async function batchGenerate() {
+  const ungeneratedCards = outfitCards.filter(c => !charMap[c.key] && c.basic_image);
+  if (ungeneratedCards.length === 0) return;
+
+  if (!confirm(`将为 ${ungeneratedCards.length} 个未生成的 Outfit 批量生成角色卡，这可能需要较长时间。继续？`)) return;
+
+  $btnBatch.disabled = true;
+  $btnBatch.textContent = `⚡ 生成中 0/${ungeneratedCards.length}`;
+
+  let completed = 0;
+  const CONCURRENCY = 3;
+
+  async function worker(queue) {
+    while (queue.length > 0) {
+      const card = queue.shift();
       try {
-        const resp = await fetch(`/api/insnap-proxy/kols?${params}`);
+        const resp = await fetch("/api/kol-characters/generate", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            profile_id: card.profile_id,
+            outfit_code: card.outfit_code,
+            image_url: card.basic_image,
+            kol_name: card.kol_name,
+            extra: "",
+          }),
+        });
         const data = await resp.json();
-
-        if (data.error) {
-          $content.innerHTML = `<div class="status-msg error">请求失败: ${escapeHtml(data.error)}<br><small>${escapeHtml(data.detail || "")}</small></div>`;
-          $pagination.style.display = "none";
-          $statsBar.style.display = "none";
-          return;
+        if (!data.error && data.item) {
+          charMap[card.key] = data.item;
         }
-
-        const items = data.items || [];
-        nextCursor = data.next_cursor || null;
-
-        if (items.length === 0 && currentPage === 1) {
-          $content.innerHTML = '<div class="status-msg">没有找到任何 KOL 数据</div>';
-          $pagination.style.display = "none";
-          $statsBar.style.display = "none";
-          return;
-        }
-
-        renderKols(items);
-
-        $statsBar.style.display = "";
-        document.getElementById("stat-count").textContent = items.length;
-        document.getElementById("stat-page-size").textContent = PAGE_SIZE;
-        document.getElementById("stat-page").textContent = currentPage;
-
-        $pagination.style.display = "";
-        $btnPrev.disabled = currentPage <= 1;
-        $btnNext.disabled = !data.has_more;
-        document.getElementById("page-info").textContent = `第 ${currentPage} 页`;
-
-      } catch (e) {
-        $content.innerHTML = `<div class="status-msg error">网络错误: ${escapeHtml(e.message)}</div>`;
-      } finally {
-        loading = false;
-        $btnFetch.disabled = false;
-        $btnFetch.textContent = "加载 KOL";
-      }
+      } catch {}
+      completed++;
+      $btnBatch.textContent = `⚡ 生成中 ${completed}/${ungeneratedCards.length}`;
     }
+  }
 
-    function renderKols(items) {
-      $content.innerHTML = `<div class="kol-grid">${items.map(renderKolCard).join("")}</div>`;
+  const queue = [...ungeneratedCards];
+  const workers = Array.from({length: Math.min(CONCURRENCY, queue.length)}, () => worker(queue));
+  await Promise.all(workers);
 
-      $content.querySelectorAll(".kol-card").forEach((card, idx) => {
-        card.addEventListener("click", () => showDetail(items[idx]));
-        card.style.cursor = "pointer";
-      });
-    }
+  renderOutfits();
+  $btnBatch.textContent = "⚡ 一键生成全部未生成";
+}
 
-    function renderKolCard(kol) {
-      const name = kol.nickname || kol.name || kol.username || `KOL #${kol.profile_id || kol.id || "?"}`;
-      const avatarContent = kol.avatar_url
-        ? `<img src="${escapeHtml(kol.avatar_url)}" alt="">`
-        : name.charAt(0).toUpperCase();
-      const id = kol.profile_id || kol.id || "";
-
-      const fields = [];
-      if (kol.platform) fields.push(["平台", kol.platform]);
-      if (kol.followers_count != null) fields.push(["粉丝", formatNum(kol.followers_count)]);
-      if (kol.posts_count != null) fields.push(["帖子", formatNum(kol.posts_count)]);
-      if (kol.engagement_rate != null) fields.push(["互动率", (kol.engagement_rate * 100).toFixed(1) + "%"]);
-      if (kol.status) fields.push(["状态", kol.status]);
-      if (kol.created_at) fields.push(["创建", formatDate(kol.created_at)]);
-
-      const tags = (kol.tags || kol.categories || []).slice(0, 4);
-
-      return `
-        <div class="kol-card">
-          <div class="kol-card-header">
-            <div class="kol-avatar">${avatarContent}</div>
-            <div>
-              <div class="kol-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-              <div class="kol-id">ID: ${escapeHtml(String(id))}</div>
-            </div>
-          </div>
-          ${tags.length > 0 ? `<div class="kol-meta">${tags.map(t => `<span class="kol-tag">${escapeHtml(String(t))}</span>`).join("")}</div>` : ""}
-          ${fields.length > 0 ? `<div class="kol-fields">${fields.map(([k, v]) => `<span class="field-label">${k}</span><span class="field-value">${escapeHtml(String(v))}</span>`).join("")}</div>` : ""}
-        </div>`;
-    }
-
-    function showDetail(kol) {
-      const overlay = document.createElement("div");
-      overlay.className = "detail-overlay";
-
-      const entries = Object.entries(kol).filter(([k, v]) => v != null && v !== "");
-      overlay.innerHTML = `
-        <div class="detail-panel">
-          <h2>${escapeHtml(kol.nickname || kol.name || kol.username || "KOL 详情")}</h2>
-          ${entries.map(([k, v]) => `
-            <div class="detail-row">
-              <span class="detail-key">${escapeHtml(k)}</span>
-              <span class="detail-val">${escapeHtml(typeof v === "object" ? JSON.stringify(v) : String(v))}</span>
-            </div>`).join("")}
-          <button class="detail-close" id="detail-close">关闭</button>
-        </div>`;
-
-      document.body.appendChild(overlay);
-      overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
-      document.getElementById("detail-close").addEventListener("click", () => overlay.remove());
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function formatNum(n) {
-      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-      if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-      return String(n);
-    }
-
-    function formatDate(d) {
-      try { return new Date(d).toLocaleDateString("zh-CN"); }
-      catch { return d; }
-    }
-  </script>
+function esc(text) {
+  const d = document.createElement("div");
+  d.textContent = text || "";
+  return d.innerHTML;
+}
+</script>
 </body>
 </html>

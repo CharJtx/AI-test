@@ -18,6 +18,7 @@ import io
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── 第三方库导入 ────────────────────────────────────────────
@@ -55,6 +56,7 @@ PRESETS_FILE = DATA_DIR / "presets.json"       # 推理参数预设
 WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
 CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
 CHATS_FILE = DATA_DIR / "chats.json"            # 聊天记录
+KOL_CHARS_FILE = DATA_DIR / "kol-characters.json" # KOL outfit 角色卡
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"  # OpenRouter API 基础地址
 
 
@@ -385,6 +387,8 @@ Return ONLY valid JSON with the same structure as a standard character card (nam
 
 
 import base64  # noqa: E402
+import io  # noqa: E402
+from PIL import Image  # noqa: E402
 
 
 @app.post("/api/characters/generate-from-image")
@@ -1321,7 +1325,7 @@ async def proxy_insnap_kols(
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-    params = {"page_size": page_size}
+    params = {"page_size": page_size, "user_type": "internal", "is_online": True}
     if cursor:
         params["cursor"] = cursor
 
@@ -1374,6 +1378,256 @@ async def proxy_insnap_discovery():
             headers={"Cache-Control": "no-store"},
         )
     return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/insnap-proxy/kols/{profile_id}/outfits")
+async def proxy_insnap_outfits(profile_id: int):
+    """代理转发 KOL outfits 请求。"""
+    try:
+        base, api_key = _get_insnap_config()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{base}/v1/kols/{profile_id}/outfits",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=502)
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
+            status_code=502, headers={"Cache-Control": "no-store"},
+        )
+    return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
+
+
+# ── KOL Outfit 角色卡管理 ──────────────────────────────────
+# 数据结构: [{key, profile_id, outfit_code, image_url, versions: [{version, data, created_at}]}]
+
+def load_kol_chars() -> list[dict]:
+    return _load_json(KOL_CHARS_FILE)
+
+
+def save_kol_chars(items: list[dict]):
+    _save_json(KOL_CHARS_FILE, items)
+
+
+def _make_outfit_key(profile_id: int, outfit_code: str) -> str:
+    return f"{profile_id}:{outfit_code}"
+
+
+@app.get("/api/kol-characters")
+async def get_kol_characters():
+    """获取所有 KOL outfit 角色卡。"""
+    return JSONResponse({"items": load_kol_chars()}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/kol-characters/generate")
+async def generate_kol_character(request: Request):
+    """为指定 outfit 图片生成角色卡，复用 CHAR_GEN_IMAGE_SYSTEM 提示词和处理逻辑。"""
+    body = await request.json()
+    profile_id = body.get("profile_id")
+    outfit_code = body.get("outfit_code", "")
+    image_url = body.get("image_url", "")
+    extra = body.get("extra", "")
+    model = body.get("model", "x-ai/grok-4.1-fast")
+    kol_name = body.get("kol_name", "")
+
+    if not profile_id or not image_url:
+        return JSONResponse({"error": "profile_id and image_url required"}, status_code=400)
+
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as dl:
+            img_resp = await dl.get(image_url)
+        if img_resp.status_code != 200:
+            return JSONResponse(
+                {"error": f"Failed to download image: HTTP {img_resp.status_code}"},
+                status_code=502,
+            )
+        raw_ct = img_resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        img_bytes = img_resp.content
+        if raw_ct not in ("image/jpeg", "image/png", "image/gif"):
+            img = Image.open(io.BytesIO(img_bytes))
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+            raw_ct = "image/png"
+            print(f"[kol-gen] Converted image to PNG ({len(img_bytes)} bytes)")
+        b64 = base64.b64encode(img_bytes).decode()
+        data_url = f"data:{raw_ct};base64,{b64}"
+        print(f"[kol-gen] Image ready: {raw_ct}, base64 length={len(b64)}")
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to download/convert image: {e}"}, status_code=502)
+
+    user_content = [
+        {"type": "image_url", "image_url": {"url": data_url}},
+    ]
+    text_part = "Generate a complete character card based on this image."
+    notes = []
+    if kol_name:
+        notes.append(f"KOL name: {kol_name}")
+    if extra.strip():
+        notes.append(f"Additional notes from the user:\n{extra.strip()}")
+    if notes:
+        text_part += "\n\n" + "\n".join(notes)
+    user_content.append({"type": "text", "text": text_part})
+
+    async with httpx.AsyncClient(timeout=180) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": CHAR_GEN_IMAGE_SYSTEM},
+                    {"role": "user", "content": user_content},
+                ],
+                "temperature": 0.9,
+                "max_tokens": 16000,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"LLM API error: {resp.status_code} - {resp.text[:200]}"},
+            status_code=502,
+        )
+
+    data = resp.json()
+    raw_content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    finish_reason = data.get("choices", [{}])[0].get("finish_reason", "unknown")
+    print(f"[kol-gen] finish_reason={finish_reason}, raw length={len(raw_content)}")
+    print(f"[kol-gen] raw first 300 chars: {raw_content[:300]}")
+
+    if not raw_content or not raw_content.strip():
+        return JSONResponse(
+            {"error": f"LLM returned empty content (finish_reason={finish_reason})",
+             "raw_response": str(data)[:500]},
+            status_code=502,
+        )
+
+    content = raw_content.strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
+
+    try:
+        char_data = json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"[kol-gen] JSON parse failed, cleaned content first 500 chars:\n{content[:500]}")
+        return JSONResponse(
+            {"error": f"Failed to parse LLM output as JSON: {str(e)}", "raw": content[:500]},
+            status_code=422,
+        )
+
+    key = _make_outfit_key(profile_id, outfit_code)
+    items = load_kol_chars()
+    existing = next((it for it in items if it["key"] == key), None)
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    if existing:
+        version = len(existing["versions"]) + 1
+        existing["versions"].append({"version": version, "data": char_data, "created_at": now})
+    else:
+        items.append({
+            "key": key,
+            "profile_id": profile_id,
+            "outfit_code": outfit_code,
+            "image_url": image_url,
+            "kol_name": kol_name,
+            "versions": [{"version": 1, "data": char_data, "created_at": now}],
+        })
+
+    save_kol_chars(items)
+    entry = next(it for it in items if it["key"] == key)
+    return JSONResponse({"item": entry}, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/kol-characters/revise")
+async def revise_kol_character(request: Request):
+    """AI 修改已有角色卡，复用 CHAR_REMIX_SYSTEM 提示词，生成新版本。"""
+    body = await request.json()
+    key = body.get("key", "")
+    instructions = body.get("instructions", "")
+    model = body.get("model", "x-ai/grok-4.1-fast")
+
+    if not key or not instructions:
+        return JSONResponse({"error": "key and instructions required"}, status_code=400)
+
+    items = load_kol_chars()
+    entry = next((it for it in items if it["key"] == key), None)
+    if not entry or not entry["versions"]:
+        return JSONResponse({"error": "character not found"}, status_code=404)
+
+    latest = entry["versions"][-1]["data"]
+    card_json = json.dumps(latest, ensure_ascii=False, indent=2)
+    user_msg = f"Original character card:\n```json\n{card_json}\n```\n\nModification instructions:\n{instructions}"
+
+    async with httpx.AsyncClient(timeout=180) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": CHAR_REMIX_SYSTEM},
+                    {"role": "user", "content": user_msg},
+                ],
+                "temperature": 0.85,
+                "max_tokens": 16000,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        detail = ""
+        try:
+            detail = resp.json().get("error", {}).get("message", resp.text[:300])
+        except Exception:
+            detail = resp.text[:300]
+        return JSONResponse(
+            {"error": f"LLM API error ({resp.status_code}): {detail}"},
+            status_code=502,
+        )
+
+    data = resp.json()
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+    content = content.strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1] if "\n" in content else content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
+
+    try:
+        char_data = json.loads(content)
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            {"error": f"Failed to parse LLM output as JSON: {str(e)}", "raw": content[:500]},
+            status_code=422,
+        )
+
+    new_version = len(entry["versions"]) + 1
+    entry["versions"].append({
+        "version": new_version,
+        "data": char_data,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    save_kol_chars(items)
+    return JSONResponse({"item": entry}, headers={"Cache-Control": "no-store"})
 
 
 # ── 静态文件托管 ────────────────────────────────────────────
