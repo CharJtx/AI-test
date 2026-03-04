@@ -1315,7 +1315,7 @@ async def proxy_insnap_kols(
     page_size: int = Query(20),
     cursor: str = Query(None),
 ):
-    """代理转发 KOL 列表请求到 InSnap /v1/kols/ 端点。"""
+    """代理转发 KOL 列表请求到 InSnap /v1/kols 端点。"""
     try:
         base, api_key = _get_insnap_config()
     except Exception as e:
@@ -1325,19 +1325,29 @@ async def proxy_insnap_kols(
     if cursor:
         params["cursor"] = cursor
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(
-            f"{base}/v1/kols/",
-            params=params,
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{base}/v1/kols",
+                params=params,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    except Exception as e:
+        print(f"[InSnap Proxy] Request exception: {e}")
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=502)
+
+    print(f"[InSnap Proxy] URL: {resp.url}")
+    print(f"[InSnap Proxy] Status: {resp.status_code}")
+    print(f"[InSnap Proxy] Headers: {dict(resp.headers)}")
+    print(f"[InSnap Proxy] Body: {resp.text[:1000]}")
 
     if resp.status_code != 200:
         return JSONResponse(
             {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
-            status_code=resp.status_code,
+            status_code=502,
+            headers={"Cache-Control": "no-store"},
         )
-    return resp.json()
+    return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/insnap-proxy/discovery")
@@ -1348,18 +1358,22 @@ async def proxy_insnap_discovery():
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(
-            f"{base}/v1/",
-            headers={"Authorization": f"Bearer {api_key}"},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{base}/v1",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=502)
 
     if resp.status_code != 200:
         return JSONResponse(
             {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
-            status_code=resp.status_code,
+            status_code=502,
+            headers={"Cache-Control": "no-store"},
         )
-    return resp.json()
+    return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
 
 
 # ── 静态文件托管 ────────────────────────────────────────────

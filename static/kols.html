@@ -228,6 +228,102 @@
       font-size: 13px;
     }
     .detail-close:hover { border-color: var(--accent); }
+
+    /* Discovery */
+    .discovery-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .discovery-header h2 { font-size: 16px; font-weight: 600; }
+    .discovery-header .discovery-meta { font-size: 12px; color: var(--text-muted); }
+    .discovery-perms {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .discovery-perms .perm-tag {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: rgba(63,185,80,0.15);
+      color: var(--success);
+      border: 1px solid rgba(63,185,80,0.3);
+      font-family: monospace;
+    }
+    .endpoint-list { display: flex; flex-direction: column; gap: 10px; }
+    .endpoint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .endpoint-card:hover { border-color: var(--accent); }
+    .endpoint-card-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .endpoint-method {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      background: rgba(88,166,255,0.15);
+      color: var(--accent);
+    }
+    .endpoint-path { font-size: 14px; font-family: monospace; font-weight: 500; }
+    .endpoint-summary { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .endpoint-perm {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+    .endpoint-details {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .endpoint-details.open { display: block; }
+    .endpoint-details h4 {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 10px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .endpoint-details h4:first-child { margin-top: 0; }
+    .param-table {
+      width: 100%;
+      font-size: 12px;
+      border-collapse: collapse;
+    }
+    .param-table th {
+      text-align: left;
+      padding: 4px 8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+    .param-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .param-table .param-name { font-family: monospace; color: var(--accent); }
+    .param-table .param-required { color: var(--danger); font-size: 10px; }
+    .resp-field { font-size: 12px; font-family: monospace; color: var(--text-muted); padding: 2px 0; }
+    .discovery-section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
+    }
   </style>
 </head>
 <body>
@@ -237,7 +333,12 @@
   </header>
 
   <div class="config-bar">
+    <button id="btn-discovery">Discovery</button>
     <button id="btn-fetch">加载 KOL</button>
+  </div>
+
+  <div id="discovery-section" style="display:none">
+    <div class="container" id="discovery-content"></div>
   </div>
 
   <div class="stats-bar" id="stats-bar" style="display:none">
@@ -248,7 +349,7 @@
 
   <div class="container">
     <div id="content">
-      <div class="status-msg">点击「加载 KOL」获取数据（需在 .env 中配置 INSNAP_API_URL 和 INSNAP_API_KEY）</div>
+      <div class="status-msg">点击「Discovery」查看 API 端点，或「加载 KOL」获取数据</div>
     </div>
     <div class="pagination" id="pagination" style="display:none">
       <button id="btn-prev" disabled>← 上一页</button>
@@ -258,6 +359,9 @@
   </div>
 
   <script>
+    const $btnDiscovery = document.getElementById("btn-discovery");
+    const $discoverySection = document.getElementById("discovery-section");
+    const $discoveryContent = document.getElementById("discovery-content");
     const $btnFetch = document.getElementById("btn-fetch");
     const $content = document.getElementById("content");
     const $pagination = document.getElementById("pagination");
@@ -270,6 +374,8 @@
     let currentPage = 1;
     let nextCursor = null;
     let loading = false;
+
+    $btnDiscovery.addEventListener("click", fetchDiscovery);
 
     $btnFetch.addEventListener("click", () => {
       cursorStack = [null];
@@ -290,6 +396,97 @@
       cursorStack.push(nextCursor);
       fetchKols(nextCursor);
     });
+
+    async function fetchDiscovery() {
+      $btnDiscovery.disabled = true;
+      $btnDiscovery.textContent = "加载中...";
+
+      try {
+        const resp = await fetch("/api/insnap-proxy/discovery");
+        const data = await resp.json();
+
+        if (data.error) {
+          $discoverySection.style.display = "";
+          $discoveryContent.innerHTML = `<div class="status-msg error">Discovery 失败: ${escapeHtml(data.error)}<br><small>${escapeHtml(data.detail || "")}</small></div>`;
+          return;
+        }
+
+        renderDiscovery(data);
+        $discoverySection.style.display = "";
+      } catch (e) {
+        $discoverySection.style.display = "";
+        $discoveryContent.innerHTML = `<div class="status-msg error">网络错误: ${escapeHtml(e.message)}</div>`;
+      } finally {
+        $btnDiscovery.disabled = false;
+        $btnDiscovery.textContent = "Discovery";
+      }
+    }
+
+    function renderDiscovery(data) {
+      const perms = data.active_permissions || [];
+      const endpoints = data.endpoints || [];
+      const version = data.api_version || "?";
+
+      $discoveryContent.innerHTML = `
+        <div class="discovery-header">
+          <h2>API Discovery</h2>
+          <span class="discovery-meta">版本: ${escapeHtml(version)} · ${endpoints.length} 个端点</span>
+        </div>
+        ${perms.length > 0 ? `
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">当前 Key 拥有的权限:</div>
+          <div class="discovery-perms">${perms.map(p => `<span class="perm-tag">${escapeHtml(p)}</span>`).join("")}</div>
+        ` : ""}
+        ${data.pagination_note ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">${escapeHtml(data.pagination_note)}</div>` : ""}
+        <div class="endpoint-list">${endpoints.map(renderEndpointCard).join("")}</div>
+        <hr class="discovery-section-divider">
+      `;
+
+      $discoveryContent.querySelectorAll(".endpoint-card").forEach(card => {
+        card.addEventListener("click", () => {
+          const details = card.querySelector(".endpoint-details");
+          if (details) details.classList.toggle("open");
+        });
+      });
+    }
+
+    function renderEndpointCard(ep) {
+      const params = ep.params || [];
+      const fields = ep.response_fields || [];
+      const addPerms = ep.additional_permissions || [];
+
+      let detailsHtml = "";
+      if (params.length > 0) {
+        detailsHtml += `<h4>Parameters</h4>
+          <table class="param-table">
+            <tr><th>Name</th><th>Type</th><th>Default</th><th>Description</th></tr>
+            ${params.map(p => `<tr>
+              <td><span class="param-name">${escapeHtml(p.name)}</span>${p.required ? ' <span class="param-required">required</span>' : ""}</td>
+              <td>${escapeHtml(p.type || "")}</td>
+              <td>${p.default != null ? escapeHtml(String(p.default)) : "-"}</td>
+              <td>${escapeHtml(p.description || "")}</td>
+            </tr>`).join("")}
+          </table>`;
+      }
+      if (fields.length > 0) {
+        detailsHtml += `<h4>Response Fields</h4>
+          ${fields.map(f => `<div class="resp-field">${escapeHtml(f.name)} <span style="color:var(--text-muted)">(${escapeHtml(f.type || "")})</span> ${f.description ? "— " + escapeHtml(f.description) : ""}</div>`).join("")}`;
+      }
+
+      return `
+        <div class="endpoint-card">
+          <div class="endpoint-card-head">
+            <span class="endpoint-method">${escapeHtml(ep.method || "GET")}</span>
+            <span class="endpoint-path">${escapeHtml(ep.path || "")}</span>
+          </div>
+          <div class="endpoint-summary">${escapeHtml(ep.summary || ep.description || "")}</div>
+          <div class="endpoint-perm">
+            🔑 ${escapeHtml(ep.permission || "")}
+            ${addPerms.length > 0 ? " + " + addPerms.map(p => escapeHtml(p)).join(", ") : ""}
+            ${ep.response_type ? ` · 📦 ${escapeHtml(ep.response_type)}` : ""}
+          </div>
+          ${detailsHtml ? `<div class="endpoint-details">${detailsHtml}</div>` : ""}
+        </div>`;
+    }
 
     async function fetchKols(cursor) {
       if (loading) return;

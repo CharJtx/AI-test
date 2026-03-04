@@ -1,0 +1,199 @@
+{
+  "api_version": "v1",
+  "base_path": "/v1",
+  "auth_scheme": "Bearer",
+  "auth_header": "Authorization",
+  "key_format": "insnap_<32 hex chars>",
+  "pagination_note": "All list endpoints use cursor-based pagination. Pass the `next_cursor` value from a response as the `cursor` query parameter to retrieve the next page. When `has_more` is false there are no more results. There is no total count. Default page_size is 20; maximum is 100.",
+  "active_permissions": [
+    "api:kol:read",
+    "api:kol:settings:read",
+    "api:post:read"
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/v1/kols/",
+      "summary": "List KOLs",
+      "description": "Returns KOLs sorted by last-update time (newest first). Supports optional full-text search on kol_name and name_override, and filtering by user_type, is_online, or soft_deleted status.",
+      "permission": "api:kol:read",
+      "additional_permissions": [],
+      "params": [
+        { "name": "page_size", "type": "int", "required": false, "default": 20, "description": "Number of items per page. Min 1, max 100." },
+        { "name": "cursor", "type": "str", "required": false, "default": null, "description": "Opaque pagination cursor from a previous response's `next_cursor` field. Omit for the first page." },
+        { "name": "search", "type": "str", "required": false, "default": null, "description": "Case-insensitive substring search on kol_name and name_override." },
+        { "name": "user_type", "type": "str", "required": false, "default": null, "description": "Filter by KOL type. Known values: 'internal', 'npc'." },
+        { "name": "is_online", "type": "bool", "required": false, "default": null, "description": "Filter by live-streaming online status." },
+        { "name": "include_deleted", "type": "bool", "required": false, "default": false, "description": "When true, include soft-deleted KOLs in results." }
+      ],
+      "response_type": "cursor_page",
+      "response_fields": [
+        { "name": "items", "type": "list", "nullable": false, "description": "Array of resource objects for this page." },
+        { "name": "next_cursor", "type": "str", "nullable": true, "description": "Opaque cursor to pass as `cursor` to get the next page. null when there are no more pages." },
+        { "name": "has_more", "type": "bool", "nullable": false, "description": "True when there is at least one more page after this one." },
+        { "name": "items[].profile_id", "type": "int", "nullable": false, "description": "Unique numeric KOL identifier." },
+        { "name": "items[].kol_name", "type": "str", "nullable": false, "description": "Original KOL name." },
+        { "name": "items[].name_override", "type": "str", "nullable": true, "description": "Display-name override set by operators. Use this if present." },
+        { "name": "items[].user_type", "type": "str", "nullable": true, "description": "'internal' for proprietary KOLs, 'npc' for NPC characters." },
+        { "name": "items[].avatar", "type": "str", "nullable": true, "description": "Avatar image URL." },
+        { "name": "items[].is_online", "type": "bool", "nullable": false, "description": "Whether the KOL is currently live." },
+        { "name": "items[].soft_deleted", "type": "bool", "nullable": false, "description": "True if the KOL has been soft-deleted." },
+        { "name": "items[].updated_time", "type": "int", "nullable": false, "description": "Last-updated epoch timestamp (seconds)." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/kols/{profile_id}",
+      "summary": "Get KOL detail",
+      "description": "Returns full detail for a single KOL identified by profile_id.",
+      "permission": "api:kol:read",
+      "additional_permissions": [],
+      "params": [
+        { "name": "profile_id", "type": "int", "required": true, "default": null, "description": "Numeric KOL profile_id (path parameter)." }
+      ],
+      "response_type": "object",
+      "response_fields": [
+        { "name": "profile_id", "type": "int", "nullable": false, "description": "Unique numeric KOL identifier." },
+        { "name": "kol_name", "type": "str", "nullable": false, "description": "Original KOL name." },
+        { "name": "name_override", "type": "str", "nullable": true, "description": "Display-name override. Use this when present." },
+        { "name": "user_type", "type": "str", "nullable": true, "description": "'internal' or 'npc'." },
+        { "name": "avatar", "type": "str", "nullable": true, "description": "Avatar image URL." },
+        { "name": "basic_video", "type": "str", "nullable": true, "description": "URL of the primary looping video for this KOL." },
+        { "name": "user_uploaded_avatar", "type": "str", "nullable": true, "description": "User-uploaded avatar fallback URL." },
+        { "name": "is_online", "type": "bool", "nullable": false, "description": "Live-streaming status." },
+        { "name": "soft_deleted", "type": "bool", "nullable": false, "description": "Soft-delete flag." },
+        { "name": "ready", "type": "bool", "nullable": false, "description": "Whether the KOL's assets are ready for use." },
+        { "name": "created_time", "type": "int", "nullable": true, "description": "Creation epoch timestamp (seconds)." },
+        { "name": "updated_time", "type": "int", "nullable": false, "description": "Last-update epoch timestamp." },
+        { "name": "social_media_urls", "type": "list", "nullable": false, "description": "List of social-media profile URLs." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/kols/{profile_id}/outfits",
+      "summary": "List KOL outfit groups",
+      "description": "Returns all outfit groups for a KOL. An outfit group bundles related visual assets: basic_image, basic_videos, gift_videos, motion_videos, and preview_videos.",
+      "permission": "api:kol:read",
+      "additional_permissions": [],
+      "params": [
+        { "name": "profile_id", "type": "int", "required": true, "default": null, "description": "Numeric KOL profile_id (path parameter)." },
+        { "name": "usage_type", "type": "str", "required": false, "default": null, "description": "Filter to outfits that include this usage type. Values: 'public', '1v1', 'npc'." }
+      ],
+      "response_type": "object",
+      "response_fields": [
+        { "name": "total", "type": "int", "nullable": false, "description": "Total number of outfit groups returned." },
+        { "name": "items", "type": "list", "nullable": false, "description": "List of outfit group objects." },
+        { "name": "items[].code", "type": "str", "nullable": false, "description": "Outfit group identifier (e.g. 'outfit_01')." },
+        { "name": "items[].usage_types", "type": "list[str]", "nullable": false, "description": "Contexts: 'public', '1v1', 'npc'." },
+        { "name": "items[].basic_image", "type": "str", "nullable": true, "description": "Still preview image URL." },
+        { "name": "items[].basic_video", "type": "str", "nullable": true, "description": "Primary idle-loop video URL." },
+        { "name": "items[].basic_videos", "type": "list[{name, url}]", "nullable": false, "description": "All idle-loop video assets." },
+        { "name": "items[].gift_videos", "type": "list[{name, url}]", "nullable": false, "description": "Gift-reaction video assets." },
+        { "name": "items[].motion_videos", "type": "list[{name, url}]", "nullable": false, "description": "Gesture/motion video assets." },
+        { "name": "items[].preview_videos", "type": "list[{name, url}]", "nullable": false, "description": "Preview video assets." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/kols/{profile_id}/settings",
+      "summary": "Get KOL settings (system prompt + TTS speaker)",
+      "description": "Returns the KOL's role-play configuration. Requires BOTH api:kol:read AND api:kol:settings:read.",
+      "permission": "api:kol:read",
+      "additional_permissions": ["api:kol:settings:read"],
+      "params": [
+        { "name": "profile_id", "type": "int", "required": true, "default": null, "description": "Numeric KOL profile_id (path parameter)." }
+      ],
+      "response_type": "object",
+      "response_fields": [
+        { "name": "system_prompt", "type": "str", "nullable": true, "description": "LLM role-play persona definition." },
+        { "name": "speaker", "type": "object", "nullable": true, "description": "TTS speaker configuration." },
+        { "name": "speaker.speaker_id", "type": "str", "nullable": true, "description": "TTS speaker identifier." },
+        { "name": "speaker.tts_model", "type": "str", "nullable": true, "description": "TTS model name." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/kols/{profile_id}/posts",
+      "summary": "List posts authored by a KOL",
+      "description": "Returns posts whose author_id equals str(profile_id), sorted newest first. Requires BOTH api:kol:read AND api:post:read.",
+      "permission": "api:kol:read",
+      "additional_permissions": ["api:post:read"],
+      "params": [
+        { "name": "profile_id", "type": "int", "required": true, "default": null, "description": "Numeric KOL profile_id (path parameter)." },
+        { "name": "page_size", "type": "int", "required": false, "default": 20, "description": "Number of items per page. Min 1, max 100." },
+        { "name": "cursor", "type": "str", "required": false, "default": null, "description": "Opaque pagination cursor." },
+        { "name": "audit_status", "type": "str", "required": false, "default": null, "description": "Filter: 'new', 'passed', 'rejected'." },
+        { "name": "has_adult_content", "type": "bool", "required": false, "default": null, "description": "Filter by adult-content flag." },
+        { "name": "is_pinned", "type": "bool", "required": false, "default": null, "description": "Filter to pinned posts only." }
+      ],
+      "response_type": "cursor_page",
+      "response_fields": [
+        { "name": "items", "type": "list", "nullable": false, "description": "Array of post objects." },
+        { "name": "next_cursor", "type": "str", "nullable": true, "description": "Pagination cursor for next page." },
+        { "name": "has_more", "type": "bool", "nullable": false, "description": "True when more pages exist." },
+        { "name": "items[].id", "type": "str", "nullable": false, "description": "MongoDB document id." },
+        { "name": "items[].post_id", "type": "int", "nullable": false, "description": "External integer post identifier." },
+        { "name": "items[].author_id", "type": "str", "nullable": true, "description": "Author identifier (string form of profile_id)." },
+        { "name": "items[].content_type", "type": "str", "nullable": true, "description": "Media type: 'image', 'video', etc." },
+        { "name": "items[].cdn_url", "type": "str", "nullable": true, "description": "CDN URL of the primary media asset." },
+        { "name": "items[].thumbnail_url", "type": "str", "nullable": true, "description": "Thumbnail image URL." },
+        { "name": "items[].audit_status", "type": "str", "nullable": true, "description": "'new', 'passed', or 'rejected'." },
+        { "name": "items[].has_adult_content", "type": "bool", "nullable": false, "description": "Adult-content flag." },
+        { "name": "items[].has_nude_content", "type": "bool", "nullable": false, "description": "Nudity flag." },
+        { "name": "items[].post_type", "type": "str", "nullable": true, "description": "'normal' or '1v1'." },
+        { "name": "items[].is_pinned", "type": "bool", "nullable": false, "description": "Pinned flag." },
+        { "name": "items[].created_at", "type": "datetime (ISO 8601 UTC)", "nullable": false, "description": "Creation timestamp." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/posts/",
+      "summary": "List Posts",
+      "description": "Returns all posts sorted by creation time (newest first).",
+      "permission": "api:post:read",
+      "additional_permissions": [],
+      "params": [
+        { "name": "page_size", "type": "int", "required": false, "default": 20, "description": "Number of items per page. Min 1, max 100." },
+        { "name": "cursor", "type": "str", "required": false, "default": null, "description": "Opaque pagination cursor." },
+        { "name": "audit_status", "type": "str", "required": false, "default": null, "description": "Filter: 'new', 'passed', 'rejected'." },
+        { "name": "post_type", "type": "str", "required": false, "default": null, "description": "Filter: 'normal', '1v1'." },
+        { "name": "author_id", "type": "str", "required": false, "default": null, "description": "Filter by author (string form of KOL profile_id)." },
+        { "name": "has_adult_content", "type": "bool", "required": false, "default": null, "description": "Filter by adult-content flag." },
+        { "name": "is_pinned", "type": "bool", "required": false, "default": null, "description": "Filter to pinned posts only." }
+      ],
+      "response_type": "cursor_page",
+      "response_fields": [
+        { "name": "items", "type": "list", "nullable": false, "description": "Array of post objects." },
+        { "name": "next_cursor", "type": "str", "nullable": true, "description": "Pagination cursor for next page." },
+        { "name": "has_more", "type": "bool", "nullable": false, "description": "True when more pages exist." },
+        { "name": "items[].id", "type": "str", "nullable": false, "description": "MongoDB document id." },
+        { "name": "items[].post_id", "type": "int", "nullable": false, "description": "External integer post identifier." },
+        { "name": "items[].author_id", "type": "str", "nullable": true, "description": "Author identifier." },
+        { "name": "items[].content_type", "type": "str", "nullable": true, "description": "Media type." },
+        { "name": "items[].cdn_url", "type": "str", "nullable": true, "description": "CDN URL of the primary media asset." },
+        { "name": "items[].audit_status", "type": "str", "nullable": true, "description": "'new', 'passed', or 'rejected'." },
+        { "name": "items[].post_type", "type": "str", "nullable": true, "description": "'normal' or '1v1'." },
+        { "name": "items[].is_pinned", "type": "bool", "nullable": false, "description": "Pinned flag." },
+        { "name": "items[].created_at", "type": "datetime (ISO 8601 UTC)", "nullable": false, "description": "Creation timestamp." }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/posts/{post_id}",
+      "summary": "Get Post detail",
+      "description": "Returns a single post by its external integer post_id.",
+      "permission": "api:post:read",
+      "additional_permissions": [],
+      "params": [
+        { "name": "post_id", "type": "int", "required": true, "default": null, "description": "External integer post_id (path parameter)." }
+      ],
+      "response_type": "object",
+      "response_fields": [
+        { "name": "id", "type": "str", "nullable": false, "description": "MongoDB document id." },
+        { "name": "post_id", "type": "int", "nullable": false, "description": "External integer post identifier." },
+        { "name": "cdn_url", "type": "str", "nullable": true, "description": "CDN URL of the primary media asset." },
+        { "name": "audit_status", "type": "str", "nullable": true, "description": "'new', 'passed', or 'rejected'." }
+      ]
+    }
+  ]
+}

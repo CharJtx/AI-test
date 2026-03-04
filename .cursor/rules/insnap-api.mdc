@@ -1,0 +1,34 @@
+---
+description: InSnap external API schema and proxy conventions. Apply when working with InSnap API integration, kols.html, or /api/insnap-proxy endpoints.
+globs: static/kols.html,server.py,data/insnap-api-schema.json
+alwaysApply: false
+---
+
+# InSnap API Integration
+
+## API Schema
+
+InSnap API 的完整端点定义（请求参数、响应字段、权限要求）保存在：
+
+```
+data/insnap-api-schema.json
+```
+
+修改或新增 InSnap 相关的前端展示或后端代理时，**必须先读取此文件**获取准确的字段名、类型和含义。不要凭记忆假设字段结构。
+
+## 代理架构
+
+- InSnap API 凭据（`INSNAP_API_URL`、`INSNAP_API_KEY`）配置在 `.env` 中，禁止硬编码或暴露给前端
+- 后端代理端点统一在 `server.py` 的 `/api/insnap-proxy/*` 路径下
+- 所有代理响应必须带 `Cache-Control: no-store`，错误统一用 `502` 状态码，不透传上游状态码
+- `httpx` 客户端必须设置 `follow_redirects=True`
+
+## KOL 字段约定
+
+- 显示名优先使用 `name_override`，为空时回退到 `kol_name`
+- `updated_time` / `created_time` 是秒级 epoch 时间戳，前端需转换
+- `avatar` 是完整图片 URL，可直接用于 `<img src>`
+
+## 分页约定
+
+所有列表端点使用游标分页：`page_size`（默认 20，最大 100）+ `cursor`（不透明字符串）。响应中 `has_more` 为 false 时无更多数据。
