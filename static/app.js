@@ -26,7 +26,9 @@ const state = {
   presets: [],           // 用户保存的参数预设
   worldbooks: [],        // 世界书列表（含条目与关键词）
   characters: [],        // 角色卡列表
-  activeCharId: null,    // 当前激活的角色卡 ID
+  kolCharacters: [],     // KOL 角色卡列表（从 kol-characters.json 加载）
+  charSource: "local",   // 角色卡来源: "local" | "kol"
+  activeCharId: null,    // 当前激活的角色卡 ID（本地为数字 id，KOL 为 key 字符串）
   streaming: false,      // 是否正在进行流式响应
   userName: localStorage.getItem("userName") || "用户",
   rpInstructions: {},    // 从后端加载的 RP 格式指令
@@ -62,7 +64,7 @@ const $presPenalty = document.getElementById("param-pres-penalty");
  */
 async function init() {
   setupSliderLabels();
-  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters(), loadTtsVoices(), loadRpInstructions()]);
+  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters(), loadKolCharacters(), loadTtsVoices(), loadRpInstructions()]);
   setupEvents();
 }
 
@@ -95,7 +97,7 @@ const $wbFileInput = document.getElementById("wb-file-input");
 
 const $charSelect = document.getElementById("char-select");
 const $btnNewChar = document.getElementById("btn-new-char");
-const $btnGenChar = document.getElementById("btn-gen-char");  // may be null on cached HTML
+const $btnGenChar = document.getElementById("btn-gen-char");
 const $btnImportChar = document.getElementById("btn-import-char");
 const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
@@ -104,6 +106,8 @@ const $btnRemixChar = document.getElementById("btn-remix-char");
 const $btnEditChar = document.getElementById("btn-edit-char");
 const $btnDeleteChar = document.getElementById("btn-delete-char");
 const $btnSendGreeting = document.getElementById("btn-send-greeting");
+const $btnSrcLocal = document.getElementById("btn-src-local");
+const $btnSrcKol = document.getElementById("btn-src-kol");
 
 /**
  * 绑定所有 UI 事件：按钮点击、输入监听、快捷键等。
@@ -144,6 +148,9 @@ function setupEvents() {
   });
   $btnDeleteChar.addEventListener("click", deleteCharacter);
   $btnSendGreeting.addEventListener("click", sendGreeting);
+
+  $btnSrcLocal?.addEventListener("click", () => switchCharSource("local"));
+  $btnSrcKol?.addEventListener("click", () => switchCharSource("kol"));
 
   // Ctrl+Enter 快捷发送
   $userInput.addEventListener("keydown", (e) => {
@@ -670,6 +677,10 @@ function getParams() {
  */
 function getActiveChar() {
   if (!state.activeCharId) return null;
+  if (state.charSource === "kol") {
+    const entry = state.kolCharacters.find((it) => it.key === state.activeCharId);
+    return entry ? _kolToChar(entry) : null;
+  }
   return state.characters.find((c) => c.id === state.activeCharId) || null;
 }
 
@@ -1444,18 +1455,70 @@ async function loadCharacters() {
     const resp = await fetch("/api/characters");
     const data = await resp.json();
     state.characters = data.characters;
-    renderCharSelect();
+    if (state.charSource === "local") renderCharSelect();
   } catch (e) {
     console.error("Failed to load characters:", e);
   }
 }
 
+async function loadKolCharacters() {
+  try {
+    const resp = await fetch("/api/kol-characters");
+    const data = await resp.json();
+    state.kolCharacters = (data.items || []).filter(it => it.versions && it.versions.length > 0);
+    if (state.charSource === "kol") renderCharSelect();
+  } catch (e) {
+    console.error("Failed to load KOL characters:", e);
+  }
+}
+
+function _kolToChar(entry) {
+  const latest = entry.versions[entry.versions.length - 1].data;
+  return {
+    ...latest,
+    id: entry.key,
+    _kol: true,
+    _kolEntry: entry,
+  };
+}
+
+function switchCharSource(source) {
+  if (state.charSource === source) return;
+  state.charSource = source;
+  state.activeCharId = null;
+
+  $btnSrcLocal.style.background = source === "local" ? "var(--accent)" : "var(--surface)";
+  $btnSrcLocal.style.color = source === "local" ? "#fff" : "var(--text)";
+  $btnSrcKol.style.background = source === "kol" ? "var(--accent)" : "var(--surface)";
+  $btnSrcKol.style.color = source === "kol" ? "#fff" : "var(--text)";
+
+  const localOnly = source === "local";
+  [$btnNewChar, $btnGenChar, $btnImportChar].forEach(el => {
+    if (el) el.style.display = localOnly ? "" : "none";
+  });
+
+  renderCharSelect();
+  renderCharInfo();
+}
+
 function renderCharSelect() {
-  $charSelect.innerHTML =
-    '<option value="">-- 未选择角色 --</option>' +
-    state.characters
-      .map((c) => `<option value="${c.id}">${escapeHtml(c.name || "未命名")}</option>`)
-      .join("");
+  if (state.charSource === "kol") {
+    $charSelect.innerHTML =
+      '<option value="">-- 未选择 KOL 角色 --</option>' +
+      state.kolCharacters
+        .map((it) => {
+          const name = it.versions[it.versions.length - 1].data.name || it.kol_name || "未命名";
+          const label = `${name} (${it.outfit_code})`;
+          return `<option value="${escapeHtml(it.key)}">${escapeHtml(label)}</option>`;
+        })
+        .join("");
+  } else {
+    $charSelect.innerHTML =
+      '<option value="">-- 未选择角色 --</option>' +
+      state.characters
+        .map((c) => `<option value="${c.id}">${escapeHtml(c.name || "未命名")}</option>`)
+        .join("");
+  }
 
   if (state.activeCharId) {
     $charSelect.value = state.activeCharId;
@@ -1463,8 +1526,12 @@ function renderCharSelect() {
 }
 
 function onCharSelect() {
-  const id = parseInt($charSelect.value);
-  state.activeCharId = id || null;
+  if (state.charSource === "kol") {
+    state.activeCharId = $charSelect.value || null;
+  } else {
+    const id = parseInt($charSelect.value);
+    state.activeCharId = id || null;
+  }
   renderCharInfo();
 }
 
@@ -1480,6 +1547,12 @@ function renderCharInfo() {
   }
 
   $charInfo.hidden = false;
+
+  const isKol = state.charSource === "kol";
+  [$btnRemixChar, $btnEditChar, $btnDeleteChar].forEach(el => {
+    if (el) el.style.display = isKol ? "none" : "";
+  });
+
   const tags = char.tags || [];
   $charTags.innerHTML = tags.length > 0
     ? tags.map((t) => `<span class="char-tag">${escapeHtml(t)}</span>`).join("")

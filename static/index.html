@@ -32,6 +32,10 @@
       <!-- 角色卡管理：选择/新建/AI生成/导入，以及头像、标签、编辑操作 -->
       <section class="panel">
         <h3>角色卡 Character</h3>
+        <div class="char-source-bar" style="display:flex;gap:4px;margin-bottom:6px">
+          <button id="btn-src-local" class="char-source-btn active" data-source="local" style="flex:1;padding:4px 0;font-size:11px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;background:var(--accent);color:#fff">本地角色卡</button>
+          <button id="btn-src-kol" class="char-source-btn" data-source="kol" style="flex:1;padding:4px 0;font-size:11px;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;background:var(--surface);color:var(--text)">KOL 角色卡</button>
+        </div>
         <div class="char-bar">
           <select id="char-select"><option value="">-- 未选择角色 --</option></select>
           <button id="btn-new-char" title="新建角色卡">+</button>
