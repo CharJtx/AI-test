@@ -67,11 +67,9 @@
         </div>
       </section>
 
-      <!-- 系统提示词：定义AI行为规则，附带RP/对话/无格式三种输出格式选择 -->
-      <section class="panel">
-        <h3>System Prompt</h3>
-        <textarea id="system-prompt" rows="8" placeholder="设定角色、场景、规则..."></textarea>
-        <div class="rp-format-toggle">
+      <!-- RP 输出格式选择 -->
+      <section class="panel" style="padding-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
           <label style="font-size:11px;color:var(--text-muted);white-space:nowrap">输出格式</label>
           <select id="rp-format-mode" style="flex:1;padding:3px 6px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
             <option value="rp">RP 格式 (*动作* 「对话」)</option>

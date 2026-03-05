@@ -875,23 +875,130 @@ async def get_rp_instructions():
 
 # ── 聊天补全（流式 SSE）────────────────────────────────────
 
+def _replace_placeholders(text: str, char_name: str, user_name: str) -> str:
+    if not text:
+        return text
+    text = re.sub(r"\{\{char\}\}", char_name or "角色", text, flags=re.IGNORECASE)
+    text = re.sub(r"\{\{user\}\}", user_name or "用户", text, flags=re.IGNORECASE)
+    return text
+
+
+def _build_char_system_prompt(char: dict | None, user_name: str) -> str:
+    if not char:
+        return ""
+    parts = []
+    if char.get("system_prompt"):
+        parts.append(char["system_prompt"])
+    if char.get("description"):
+        parts.append(f"[Character Description]\n{char['description']}")
+    if char.get("personality"):
+        parts.append(f"[Personality]\n{char['personality']}")
+    if char.get("scenario"):
+        parts.append(f"[Scenario]\n{char['scenario']}")
+    return _replace_placeholders("\n\n".join(parts), char.get("name"), user_name)
+
+
+def _parse_mes_example(mes_example: str, char_name: str, user_name: str) -> list[dict]:
+    if not mes_example or not mes_example.strip():
+        return []
+    text = _replace_placeholders(mes_example, char_name, user_name)
+    blocks = re.split(r"<START>", text, flags=re.IGNORECASE)
+    examples = []
+    escaped_name = re.escape(char_name) if char_name else "角色"
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        lines = block.split("\n")
+        current_role = None
+        current_content = ""
+        user_pat = re.compile(r"^(?:\{\{user\}\}|用户|User)\s*[:：]\s*(.*)", re.IGNORECASE)
+        char_pat = re.compile(
+            rf"^(?:\{{\{{char\}}\}}|{escaped_name}|Assistant)\s*[:：]\s*(.*)", re.IGNORECASE
+        )
+        for line in lines:
+            um = user_pat.match(line)
+            cm = char_pat.match(line)
+            if um:
+                if current_role:
+                    examples.append({"role": current_role, "content": current_content.strip()})
+                current_role = "user"
+                current_content = um.group(1)
+            elif cm:
+                if current_role:
+                    examples.append({"role": current_role, "content": current_content.strip()})
+                current_role = "assistant"
+                current_content = cm.group(1)
+            elif current_role:
+                current_content += "\n" + line
+        if current_role and current_content.strip():
+            examples.append({"role": current_role, "content": current_content.strip()})
+    return examples
+
+
+def _gather_worldbook_context(conversation_messages: list[dict]) -> str:
+    all_text = "\n".join(m.get("content", "") for m in conversation_messages).lower()
+    matched = []
+    for book in load_worldbooks():
+        if not book.get("enabled"):
+            continue
+        for entry in book.get("entries", []):
+            if not entry.get("enabled"):
+                continue
+            keywords = entry.get("keywords", [])
+            if any(kw.lower() in all_text for kw in keywords):
+                matched.append(entry.get("content", ""))
+    if not matched:
+        return ""
+    return "[World Book Context]\n" + "\n\n".join(matched)
+
+
 @app.post("/api/chat")
 async def chat(request: Request):
     """
-    流式聊天补全接口，透传请求到 OpenRouter 并以 SSE 格式返回。
+    流式聊天补全接口。
+
+    前端发送角色卡、对话消息和参数，后端负责组装完整的 system prompt
+    （角色设定 + RP格式指令 + 视觉暗示 + 世界书上下文）和 few-shot 示例，
+    然后向 OpenRouter 发起流式请求并以 SSE 格式返回。
 
     请求体参数:
         model (str): 模型 ID
-        messages (list): 聊天消息列表（OpenAI 格式）
-        params (dict): 可选推理参数（temperature, max_tokens 等）
-    返回: text/event-stream SSE 流，每行格式为 "data: {...}"
+        conversation (list): 用户/助手对话消息
+        params (dict): 推理参数
+        character (dict|null): 当前角色卡数据
+        rp_format_mode (str): RP 格式模式 "rp"|"dialogue"|"none"
+        user_name (str): 用户昵称
     """
     body = await request.json()
     model = body["model"]
-    messages = body["messages"]
+    conversation = body.get("conversation", [])
     params = body.get("params", {})
+    character = body.get("character")
+    rp_mode = body.get("rp_format_mode", "none")
+    user_name = body.get("user_name", "用户")
 
-    # 将前端传入的推理参数展开合并到请求载荷中，过滤 None 值
+    char_system = _build_char_system_prompt(character, user_name)
+    rp_hint = RP_INSTRUCTIONS.get(rp_mode, "")
+    visual_hint = RP_INSTRUCTIONS.get("visual_scene_hint", "") if character else ""
+    wb_context = _gather_worldbook_context(conversation)
+
+    full_system = "\n\n".join(p for p in [char_system, rp_hint, visual_hint, wb_context] if p)
+
+    messages = []
+    if full_system:
+        messages.append({"role": "system", "content": full_system})
+
+    if character and character.get("mes_example"):
+        examples = _parse_mes_example(
+            character["mes_example"], character.get("name", ""), user_name
+        )
+        messages.extend(examples)
+
+    for m in conversation:
+        messages.append({"role": m["role"], "content": m["content"]})
+
     payload = {
         "model": model,
         "messages": messages,
@@ -900,7 +1007,6 @@ async def chat(request: Request):
     }
 
     async def event_stream():
-        """内部生成器：将 OpenRouter 的 SSE 响应逐行转发给前端。"""
         async with httpx.AsyncClient(timeout=120) as client:
             async with client.stream(
                 "POST",

@@ -31,13 +31,11 @@ const state = {
   activeCharId: null,    // 当前激活的角色卡 ID（本地为数字 id，KOL 为 key 字符串）
   streaming: false,      // 是否正在进行流式响应
   userName: localStorage.getItem("userName") || "用户",
-  rpInstructions: {},    // 从后端加载的 RP 格式指令
 };
 
 // ── DOM 元素引用 ─────────────────────────────────────────
 // 缓存页面中频繁访问的 DOM 元素，避免重复查询
 const $userName = document.getElementById("user-name");
-const $systemPrompt = document.getElementById("system-prompt");
 const $modelSearch = document.getElementById("model-search");
 const $modelList = document.getElementById("model-list");
 const $selectedTags = document.getElementById("selected-tags");
@@ -64,7 +62,7 @@ const $presPenalty = document.getElementById("param-pres-penalty");
  */
 async function init() {
   setupSliderLabels();
-  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters(), loadKolCharacters(), loadTtsVoices(), loadRpInstructions()]);
+  await Promise.all([loadModels(), loadPresets(), loadWorldbooks(), loadCharacters(), loadKolCharacters(), loadTtsVoices()]);
   setupEvents();
 }
 
@@ -639,7 +637,6 @@ async function sendMessage() {
   $btnSend.textContent = "生成中...";
   $userInput.value = "";
 
-  const systemPrompt = $systemPrompt.value.trim();
   const params = getParams();
 
   for (const modelId of state.selectedModels) {
@@ -649,7 +646,7 @@ async function sendMessage() {
   renderChatColumns();
 
   const streams = state.selectedModels.map((modelId) =>
-    streamChat(modelId, systemPrompt, params)
+    streamChat(modelId, params)
   );
 
   await Promise.all(streams);
@@ -692,116 +689,6 @@ function replacePlaceholders(text, charName) {
   return text.replace(/\{\{char\}\}/gi, charName || "角色").replace(/\{\{user\}\}/gi, state.userName || "用户");
 }
 
-/**
- * 根据角色卡数据构建完整的系统提示词。
- * 将 system_prompt、description、personality、scenario 按段落拼接，
- * 最后替换占位符。
- */
-function buildCharSystemPrompt(char) {
-  if (!char) return "";
-  const parts = [];
-  if (char.system_prompt) parts.push(char.system_prompt);
-  if (char.description) parts.push(`[Character Description]\n${char.description}`);
-  if (char.personality) parts.push(`[Personality]\n${char.personality}`);
-  if (char.scenario) parts.push(`[Scenario]\n${char.scenario}`);
-  const combined = parts.join("\n\n");
-  return replacePlaceholders(combined, char.name);
-}
-
-/**
- * 解析角色卡中的 mes_example（示例对话）字段为消息数组。
- *
- * 格式约定：
- *   - 以 <START> 分隔多组示例
- *   - 每行以 "{{user}}:" 或 "{{char}}:" 开头标记说话人
- *   - 连续行归属于最近的说话人
- *
- * 返回 [{role: "user"|"assistant", content: string}, ...] 供注入到 messages 中作为 few-shot 示例。
- */
-function parseMesExample(mesExample, charName) {
-  if (!mesExample || !mesExample.trim()) return [];
-  const text = replacePlaceholders(mesExample, charName);
-  // 按 <START> 标记拆分为多组示例
-  const blocks = text.split(/<START>/i).filter((b) => b.trim());
-  const examples = [];
-
-  for (const block of blocks) {
-    const lines = block.trim().split("\n");
-    let currentRole = null;
-    let currentContent = "";
-
-    for (const line of lines) {
-      // 匹配用户发言行
-      const userMatch = line.match(/^(?:\{\{user\}\}|用户|User)\s*[:：]\s*(.*)/i);
-      // 匹配角色发言行（动态使用角色名）
-      const charMatch = line.match(
-        new RegExp(`^(?:\\{\\{char\\}\\}|${charName ? charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '角色'}|Assistant)\\s*[:：]\\s*(.*)`, "i")
-      );
-
-      if (userMatch) {
-        if (currentRole) examples.push({ role: currentRole, content: currentContent.trim() });
-        currentRole = "user";
-        currentContent = userMatch[1];
-      } else if (charMatch) {
-        if (currentRole) examples.push({ role: currentRole, content: currentContent.trim() });
-        currentRole = "assistant";
-        currentContent = charMatch[1];
-      } else if (currentRole) {
-        currentContent += "\n" + line;
-      }
-    }
-    if (currentRole && currentContent.trim()) {
-      examples.push({ role: currentRole, content: currentContent.trim() });
-    }
-  }
-  return examples;
-}
-
-/**
- * 根据当前对话内容，扫描所有已启用的世界书条目，
- * 如果对话文本中包含某条目的关键词，就将该条目的内容收集起来。
- *
- * 返回拼接好的世界书上下文字符串（以 "[World Book Context]" 为标题），
- * 无匹配时返回空字符串。
- */
-function gatherWorldbookContext(conversationMessages) {
-  const allText = conversationMessages.map((m) => m.content).join("\n").toLowerCase();
-  const matched = [];
-
-  for (const book of state.worldbooks) {
-    if (!book.enabled) continue;
-    for (const entry of book.entries) {
-      if (!entry.enabled) continue;
-      const hit = (entry.keywords || []).some((kw) => allText.includes(kw.toLowerCase()));
-      if (hit) {
-        matched.push(entry.content);
-      }
-    }
-  }
-
-  if (matched.length === 0) return "";
-  return "[World Book Context]\n" + matched.join("\n\n");
-}
-
-/**
- * 从后端加载 RP 格式指令，避免在前端硬编码导致频繁发版。
- */
-async function loadRpInstructions() {
-  try {
-    const resp = await fetch("/api/rp-instructions");
-    state.rpInstructions = await resp.json();
-  } catch (e) {
-    console.error("Failed to load RP instructions:", e);
-  }
-}
-
-/**
- * 根据用户选择的 RP 格式模式返回对应的格式指令。
- */
-function getFormatHint() {
-  const mode = document.getElementById("rp-format-mode")?.value || "none";
-  return state.rpInstructions[mode] || "";
-}
 
 /**
  * 对单个模型发起流式聊天请求（SSE 协议）。
@@ -814,35 +701,11 @@ function getFormatHint() {
  *   5. 通过 fetch 读取 SSE 流，逐块解析 delta.content 并实时更新界面
  *   6. 流结束后移除 _streaming 标记并最终渲染
  */
-async function streamChat(modelId, systemPrompt, params) {
-  const messages = [];
+async function streamChat(modelId, params) {
   const convMsgs = state.conversations[modelId];
   const activeChar = getActiveChar();
+  const rpMode = document.getElementById("rp-format-mode")?.value || "none";
 
-  // 组装完整的系统提示词
-  const charSystem = buildCharSystemPrompt(activeChar);
-  const rpHint = getFormatHint();
-  const wbContext = gatherWorldbookContext(convMsgs);
-  const visualHint = activeChar ? (state.rpInstructions.visual_scene_hint || "") : "";
-  const fullSystem = [charSystem, systemPrompt, rpHint, visualHint, wbContext].filter(Boolean).join("\n\n");
-
-  if (fullSystem) {
-    messages.push({ role: "system", content: fullSystem });
-  }
-
-  // 注入 mes_example 作为 few-shot 示例对话
-  if (activeChar?.mes_example) {
-    const examples = parseMesExample(activeChar.mes_example, activeChar.name);
-    for (const ex of examples) {
-      messages.push({ role: ex.role, content: ex.content });
-    }
-  }
-
-  for (const m of convMsgs) {
-    messages.push({ role: m.role, content: m.content });
-  }
-
-  // 插入空的助手消息作为流式输出的占位
   state.conversations[modelId].push({ role: "assistant", content: "", _streaming: true });
   const msgIdx = state.conversations[modelId].length - 1;
   renderMessages(modelId);
@@ -851,7 +714,14 @@ async function streamChat(modelId, systemPrompt, params) {
     const resp = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: modelId, messages, params }),
+      body: JSON.stringify({
+        model: modelId,
+        conversation: convMsgs.filter(m => !m._streaming).map(m => ({ role: m.role, content: m.content })),
+        params,
+        character: activeChar,
+        rp_format_mode: rpMode,
+        user_name: state.userName,
+      }),
     });
 
     const reader = resp.body.getReader();
@@ -947,7 +817,6 @@ function saveChatDialog() {
       timestamp: new Date().toISOString(),
       activeCharId: state.activeCharId,
       charName: activeChar?.name || "",
-      systemPrompt: $systemPrompt.value,
       selectedModels: [...state.selectedModels],
       conversations: {},
       params: getParams(),
@@ -1063,8 +932,6 @@ async function loadChat(chatId) {
     if (!resp.ok) throw new Error("load failed");
     const { chat } = await resp.json();
 
-    if (chat.systemPrompt != null) $systemPrompt.value = chat.systemPrompt;
-
     // 恢复模型参数到 UI 滑块
     if (chat.params) {
       if (chat.params.temperature != null) {
@@ -1143,7 +1010,6 @@ function applyPreset() {
   const preset = state.presets.find((p) => p.id === id);
   if (!preset) return;
 
-  $systemPrompt.value = preset.systemPrompt || "";
   if (preset.params) {
     if (preset.params.temperature != null) {
       $temperature.value = preset.params.temperature;
@@ -1200,7 +1066,6 @@ function savePresetDialog() {
 
     const preset = {
       name,
-      systemPrompt: $systemPrompt.value,
       models: [...state.selectedModels],
       params: getParams(),
     };
@@ -1984,7 +1849,7 @@ function openCharEditor(existingChar) {
         <div class="char-field">
           <label>角色专用 System Prompt（可选）</label>
           <textarea id="ce-system-prompt" rows="3" placeholder="额外的 system 指令，如文风要求、输出格式...">${escapeHtml(char.system_prompt)}</textarea>
-          <div class="hint">会和侧边栏的 System Prompt 叠加使用</div>
+          <div class="hint">角色专属的系统指令，与角色设定一起注入</div>
         </div>
         <div class="char-field">
           <label>标签 Tags</label>
