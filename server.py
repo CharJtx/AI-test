@@ -700,7 +700,7 @@ Given a passage of roleplay text, extract the visual scene and produce a prompt 
 Rules:
 1. Output ONLY the prompt text, nothing else — no explanations, no labels, no markdown.
 2. Write the prompt in ENGLISH regardless of the input language.
-3. Focus on: character appearance (hair, eyes, body, clothing, expression), pose/action, setting/background, lighting, mood/atmosphere.
+3. Focus on: pose/action, clothing STATE (wet, lifted, torn, disheveled, unbuttoned, etc. — do NOT describe clothing color, pattern, material, or style), expression/emotion, setting/background, lighting, mood/atmosphere. Do NOT describe the female character's physical appearance (face, hair, eyes, body, skin, etc.) — a reference image will be used as the base.
 4. Use comma-separated descriptive tags and short phrases, like image generation prompts typically look.
 5. The prompt MUST be styled as realistic photography. Always include these realism tags: "photorealistic, realistic photograph, real environment, cinematic composition, professional lighting, sharp background with rich details, clear translucent skin texture, natural skin pores, shot on Canon EOS R5, 85mm lens, shallow depth of field"
 6. Include quality boosters at the end: "masterpiece, best quality, highly detailed, 8k uhd, RAW photo"
