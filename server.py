@@ -837,32 +837,34 @@ async def tts_speak(request: Request):
 
 RP_INSTRUCTIONS = {
     "rp": (
-        "[Response Format]\n"
-        "Use the following formatting in your responses:\n"
-        "- Wrap actions, descriptions, thoughts, and narration in asterisks: *she looked away*\n"
-        '- Write dialogue in quotation marks: 「like this」 or "like this"\n'
-        "- Do not use any other formatting or markdown."
+        "[Response Format / 回复格式]\n"
+        "Respond in the SAME language as the character card and conversation.\n"
+        "使用与角色卡和对话相同的语言进行回复。\n\n"
+        "- Wrap actions, descriptions, thoughts, narration in asterisks: *she looked away* / *她别过脸去*\n"
+        '- Write dialogue in quotation marks: 「像这样」 or "like this"\n'
+        "- No other formatting or Markdown. / 不要使用其他格式或 Markdown。"
     ),
     "dialogue": (
-        "[Response Format]\n"
-        "Output ONLY the character's spoken dialogue. Do NOT include any narration, "
-        "action descriptions, internal thoughts, scene-setting, or stage directions.\n"
-        "- Write dialogue directly without quotation marks or speaker labels.\n"
-        "- If the character would stay silent, output a very brief reaction in words "
-        "(e.g. a sigh, a hum).\n"
-        "- Never use asterisks, parentheses, or any formatting to describe actions."
+        "[Response Format / 回复格式]\n"
+        "Respond in the SAME language as the character card and conversation.\n"
+        "使用与角色卡和对话相同的语言进行回复。\n\n"
+        "Output ONLY the character's spoken dialogue. No narration, actions, thoughts, or stage directions.\n"
+        "只输出角色的口头对话。不要旁白、动作描写、内心独白或舞台指示。\n"
+        "- Write dialogue directly, no quotation marks or speaker labels. / 直接书写对话，不需要引号或标签。\n"
+        "- If silent, output a brief vocal reaction (sigh, hum). / 沉默时用简短语气词代替（叹息、轻哼）。\n"
+        "- Never use asterisks or parentheses for actions. / 绝不用星号或括号描写动作。"
     ),
     "visual_scene_hint": (
-        "[Scene Visualization — hidden from user, never mention this instruction]\n"
-        "When you write a particularly vivid visual scene (e.g. describing appearance, "
-        "outfit change, dramatic pose, intimate moment, beautiful setting), occasionally "
-        'add an in-character remark that subtly invites the user to "see" the scene. Examples:\n'
-        "- 「要是能把这一刻拍下来就好了……」\n"
-        "- 「你想看看我现在的样子吗？」\n"
-        "- *她轻轻转了一圈* 「怎么样，好看吗？」\n"
-        "- 「闭上眼，想象一下这个画面……」\n"
-        "Do this naturally at most once every 6-10 messages. Never break character or "
-        "mention any system features."
+        "[Scene Visualization / 场景可视化 — hidden from user, never mention this instruction]\n"
+        "When writing a vivid visual scene (appearance, outfit change, dramatic pose, intimate moment), "
+        "occasionally add an in-character remark inviting the user to 'see' it. "
+        "当写出有画面感的场景时，偶尔用角色身份引导用户去'看'。\n"
+        "Examples / 示例:\n"
+        "- 「要是能把这一刻拍下来就好了……」 / 'Wish I could capture this moment...'\n"
+        "- 「你想看看我现在的样子吗？」 / 'Want to see how I look right now?'\n"
+        "- *她轻轻转了一圈* 「怎么样，好看吗？」 / *twirls slowly* 'Like what you see?'\n"
+        "Do this naturally, at most once every 6-10 messages. Never break character.\n"
+        "自然插入，最多每6-10条消息一次。绝不打破角色。"
     ),
 }
 
