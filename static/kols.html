@@ -83,6 +83,10 @@
 
   <div class="toolbar">
     <button id="btn-fetch">加载 KOL + Outfits</button>
+    <span style="color:var(--text-muted);font-size:12px">|</span>
+    <input type="text" id="input-profile-ids" placeholder="输入 profile_id（多个用逗号分隔）" style="padding:5px 10px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);outline:none;width:280px">
+    <button id="btn-fetch-ids" class="secondary">按 ID 查询</button>
+    <span style="color:var(--text-muted);font-size:12px">|</span>
     <button id="btn-batch" class="batch" disabled>⚡ 一键生成全部未生成</button>
     <span class="spacer"></span>
     <span class="info" id="toolbar-info"></span>
@@ -108,6 +112,8 @@ const $btnBatch = $("btn-batch");
 const $btnPrev = $("btn-prev");
 const $btnNext = $("btn-next");
 const $toolbarInfo = $("toolbar-info");
+const $inputIds = $("input-profile-ids");
+const $btnFetchIds = $("btn-fetch-ids");
 
 const PAGE_SIZE = 10;
 let cursorStack = [null];
@@ -122,6 +128,8 @@ $btnFetch.addEventListener("click", () => { cursorStack=[null]; currentPage=1; f
 $btnPrev.addEventListener("click", () => { if(currentPage<=1)return; currentPage--; cursorStack.pop(); fetchPage(cursorStack[cursorStack.length-1]); });
 $btnNext.addEventListener("click", () => { if(!nextCursor)return; currentPage++; cursorStack.push(nextCursor); fetchPage(nextCursor); });
 $btnBatch.addEventListener("click", batchGenerate);
+$btnFetchIds.addEventListener("click", fetchByProfileIds);
+$inputIds.addEventListener("keydown", e => { if (e.key === "Enter") fetchByProfileIds(); });
 
 async function fetchPage(cursor) {
   if (loading) return;
@@ -187,6 +195,71 @@ async function fetchPage(cursor) {
     loading = false;
     $btnFetch.disabled = false;
     $btnFetch.textContent = "加载 KOL + Outfits";
+  }
+}
+
+async function fetchByProfileIds() {
+  const raw = $inputIds.value.trim();
+  if (!raw) { alert("请输入至少一个 profile_id"); return; }
+  const ids = [...new Set(raw.split(/[,，\s]+/).map(s => s.trim()).filter(s => /^\d+$/.test(s)))];
+  if (ids.length === 0) { alert("未识别到有效的 profile_id"); return; }
+
+  if (loading) return;
+  loading = true;
+  $btnFetchIds.disabled = true;
+  $btnFetchIds.textContent = "查询中...";
+  $content.innerHTML = `<div class="status-msg">查询 ${ids.length} 个 KOL...</div>`;
+  $pagination.style.display = "none";
+
+  try {
+    const charResp = await fetch("/api/kol-characters");
+    const charData = await charResp.json();
+    charMap = {};
+    for (const item of (charData.items || [])) charMap[item.key] = item;
+
+    outfitCards = [];
+    let loaded = 0;
+
+    const outfitPromises = ids.map(async id => {
+      try {
+        const kolResp = await fetch(`/api/insnap-proxy/kols/${id}`);
+        const kol = await kolResp.json();
+        if (kol.error) return [];
+        const name = kol.name_override || kol.kol_name || `KOL #${kol.profile_id}`;
+
+        const oResp = await fetch(`/api/insnap-proxy/kols/${id}/outfits`);
+        const oData = await oResp.json();
+        if (oData.error || !oData.items) return [];
+        loaded++;
+        $content.innerHTML = `<div class="status-msg">已加载 ${loaded}/${ids.length} 个 KOL...</div>`;
+        return oData.items.map(o => ({
+          profile_id: kol.profile_id,
+          kol_name: name,
+          avatar: kol.avatar,
+          outfit_code: o.code,
+          usage_types: o.usage_types || [],
+          basic_image: o.basic_image,
+          basic_video: o.basic_video,
+          key: `${kol.profile_id}:${o.code}`,
+        }));
+      } catch { return []; }
+    });
+
+    const results = await Promise.all(outfitPromises);
+    outfitCards = results.flat();
+
+    if (outfitCards.length === 0) {
+      $content.innerHTML = '<div class="status-msg">未找到任何 Outfit 数据</div>';
+      return;
+    }
+
+    renderOutfits();
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    loading = false;
+    $btnFetchIds.disabled = false;
+    $btnFetchIds.textContent = "按 ID 查询";
   }
 }
 

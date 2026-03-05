@@ -1486,6 +1486,31 @@ async def proxy_insnap_discovery():
     return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/insnap-proxy/kols/{profile_id}")
+async def proxy_insnap_kol_detail(profile_id: int):
+    """代理转发单个 KOL 详情请求。"""
+    try:
+        base, api_key = _get_insnap_config()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(
+                f"{base}/v1/kols/{profile_id}",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+    except Exception as e:
+        return JSONResponse({"error": f"Request failed: {e}"}, status_code=502)
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"InSnap API error: {resp.status_code}", "detail": resp.text[:500]},
+            status_code=502, headers={"Cache-Control": "no-store"},
+        )
+    return JSONResponse(resp.json(), headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/insnap-proxy/kols/{profile_id}/outfits")
 async def proxy_insnap_outfits(profile_id: int):
     """代理转发 KOL outfits 请求。"""
