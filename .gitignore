@@ -10,6 +10,9 @@ venv/
 # Environment
 .env
 
+# Runtime data
+data/chats.json
+
 # Video assets (too large for GitHub)
 playground/scenes/**/*.mp4
 playground/scenes/**/*.webm
