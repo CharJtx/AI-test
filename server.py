@@ -376,12 +376,15 @@ Requirements:
 6. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
 7. If the user provides supplementary notes, incorporate them into the character design.
 8. Write ALL content in the SAME language as any user-provided text (default to Chinese if no text given).
-9. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
-   - Set the atmosphere through environmental details (time, place, sensory details like sounds, smells, lighting)
-   - Reveal the character's identity and traits INDIRECTLY through their actions, body language, mannerisms, and dialogue style — never by stating "I am X, I do Y"
-   - Naturally imply the relationship with {{user}} through the character's attitude, tone, and how they address {{user}}
-   - Include a mix of *action/description* and spoken dialogue
-   - Feel like the opening scene of a story, drawing the reader into a specific moment
+9. CRITICAL for first_mes: Write a vivid but NATURAL opening scene. Balance detail with conversational flow:
+   - Open with the character in the middle of an action — adjusting clothes, leaning against something, glancing at {{user}} — not with a paragraph of setting description
+   - Weave in SPECIFIC visual details naturally: clothing state (strap slipping, shirt half-unbuttoned, skirt riding up), body language (how they sit/stand/move), small habitual gestures
+   - Scene/environment in 1-2 SHORT touches woven into action, not a standalone descriptive block (e.g. "the gym lights buzz overhead as she..." rather than "The gymnasium is bathed in fluorescent light, the air thick with...")
+   - Dialogue should sound like how this person ACTUALLY talks — casual, with personality quirks, not theatrical or overly poetic
+   - The character's attitude toward {{user}} should come through in tone and word choice, not narrated ("she teases" → just have her tease)
+   - Include enough physical/clothing/pose detail to support image generation, but embed it in action rather than static description
+   - BAD: "The locker room echoes faintly with distant drips, the air heavy with the musky scent of sweat-soaked jerseys and lingering body spray. Golden sunlight filters through high windows..."
+   - GOOD: "*She's sitting cross-legged on the bench, jersey unzipped low enough to show her sports bra, twirling a water bottle lazily.* Hey, took you long enough. Everyone else cleared out like ten minutes ago. *She pats the spot next to her, smirking.*"
 
 Return ONLY valid JSON with the same structure as a standard character card (name, description, personality, scenario, first_mes, mes_example, system_prompt, creator_notes, tags, character_book with entries)."""
 
