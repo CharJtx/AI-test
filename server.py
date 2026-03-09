@@ -210,7 +210,15 @@ Requirements:
 4. Use {{char}} for the character's name and {{user}} for the user in all text fields.
 5. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
 6. Write ALL content in the SAME language as the user's keywords input.
-7. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
+7. CRITICAL for character_book entry "content" field — write in NATURAL, descriptive prose:
+   - Each entry MUST be 2-4 complete, grammatically correct sentences that read like a writer's reference note.
+   - NEVER use compressed telegram-style fragments that omit subjects, verbs, or connectives.
+   - BAD (Chinese): "{{char}}享受辣妹受欢迎，却厌伪装疲惫，渴望{{user}}爱真我。"
+   - GOOD (Chinese): "{{char}}其实很享受辣妹身份带来的人气和关注，但长期维持这个人设让她越来越疲惫。她内心深处渴望{{user}}能看到卸下伪装后真实的自己，而不只是那个永远在笑的辣妹。"
+   - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
+   - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
+   - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
+8. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
    - Set the atmosphere through environmental details (time, place, sensory details like sounds, smells, lighting)
    - Reveal the character's identity and traits INDIRECTLY through their actions, body language, mannerisms, and dialogue style — never by stating "I am X, I do Y"
    - Naturally imply the relationship with {{user}} through the character's attitude, tone, and how they address {{user}}
@@ -349,15 +357,23 @@ Your task: Transform the character card according to the instructions while pres
 Rules:
 1. Naturally integrate the requested changes into ALL relevant fields (description, personality, scenario, first_mes, mes_example, system_prompt, character_book).
 2. Update the character_book: modify existing entries that relate to the changes, and ADD new entries (2-5) specifically covering the new traits/themes.
-3. Rewrite first_mes to reflect the changes while keeping the same immersive narrative scene style:
+3. CRITICAL for character_book entry "content" field — write in NATURAL, descriptive prose:
+   - Each entry MUST be 2-4 complete, grammatically correct sentences that read like a writer's reference note.
+   - NEVER use compressed telegram-style fragments that omit subjects, verbs, or connectives.
+   - BAD (Chinese): "{{char}}享受辣妹受欢迎，却厌伪装疲惫，渴望{{user}}爱真我。"
+   - GOOD (Chinese): "{{char}}其实很享受辣妹身份带来的人气和关注，但长期维持这个人设让她越来越疲惫。她内心深处渴望{{user}}能看到卸下伪装后真实的自己，而不只是那个永远在笑的辣妹。"
+   - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
+   - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
+   - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
+4. Rewrite first_mes to reflect the changes while keeping the same immersive narrative scene style:
    - Set atmosphere through environmental details
    - Reveal traits INDIRECTLY through actions and dialogue
    - Include *action/description* and spoken dialogue
-4. Update tags to include the new themes.
-5. Keep {{char}} and {{user}} placeholders intact.
-6. Write in the SAME language as the original card.
-7. The result must feel like a coherent, unified character — not a patchwork of old + new.
-8. Return ONLY valid JSON with the exact same structure as the input (no markdown, no explanation)."""
+5. Update tags to include the new themes.
+6. Keep {{char}} and {{user}} placeholders intact.
+7. Write in the SAME language as the original card.
+8. The result must feel like a coherent, unified character — not a patchwork of old + new.
+9. Return ONLY valid JSON with the exact same structure as the input (no markdown, no explanation)."""
 
 
 # 图像识别生成角色卡系统提示词：接收角色图片，通过视觉推理
@@ -376,7 +392,19 @@ Requirements:
 6. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
 7. If the user provides supplementary notes, incorporate them into the character design.
 8. Write ALL content in the SAME language as any user-provided text (default to Chinese if no text given).
-9. CRITICAL for first_mes: Write a vivid but NATURAL opening scene. Balance detail with conversational flow:
+9. CRITICAL for character_book entry "content" field — write in NATURAL, descriptive prose:
+   - Each entry MUST be 2-4 complete, grammatically correct sentences that read like a writer's reference note.
+   - NEVER use compressed telegram-style fragments that omit subjects, verbs, or connectives.
+   - BAD (Chinese): "{{char}}享受辣妹受欢迎，却厌伪装疲惫，渴望{{user}}爱真我。"
+   - GOOD (Chinese): "{{char}}其实很享受辣妹身份带来的人气和关注，但长期维持这个人设让她越来越疲惫。她内心深处渴望{{user}}能看到卸下伪装后真实的自己，而不只是那个永远在笑的辣妹。"
+   - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
+   - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
+   - BAD (Chinese): "过去因巨乳被嘲，曾哭逃回家，现伪装自保，提及颤抖。"
+   - GOOD (Chinese): "{{char}}曾因身材被同学嘲笑和霸凌，有一次哭着跑回了家。这段经历让她学会了用辣妹的强势外表来保护自己，但每当有人提起那段过去，她还是会不自觉地发抖。"
+   - BAD (English): "Bullied for body before, cried home, now masks to cope, trembles when mentioned."
+   - GOOD (English): "{{char}} was bullied by classmates for her figure and once ran home in tears. That experience taught her to hide behind a tough, confident exterior, but she still trembles involuntarily whenever someone brings up those memories."
+   - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
+10. CRITICAL for first_mes: Write a vivid but NATURAL opening scene. Balance detail with conversational flow:
    - Open with the character in the middle of an action — adjusting clothes, leaning against something, glancing at {{user}} — not with a paragraph of setting description
    - Weave in SPECIFIC visual details naturally: clothing state (strap slipping, shirt half-unbuttoned, skirt riding up), body language (how they sit/stand/move), small habitual gestures
    - Scene/environment in 1-2 SHORT touches woven into action, not a standalone descriptive block (e.g. "the gym lights buzz overhead as she..." rather than "The gymnasium is bathed in fluorescent light, the air thick with...")
@@ -844,7 +872,7 @@ RP_INSTRUCTIONS = {
         "Respond in the SAME language as the character card and conversation.\n"
         "使用与角色卡和对话相同的语言进行回复。\n\n"
         "- Wrap actions, descriptions, thoughts, narration in asterisks: *she looked away* / *她别过脸去*\n"
-        '- Write dialogue in quotation marks: 「像这样」 or "like this"\n'
+        '- Write dialogue in quotation marks: "像这样" or "like this"\n'
         "- No other formatting or Markdown. / 不要使用其他格式或 Markdown。"
     ),
     "dialogue": (
