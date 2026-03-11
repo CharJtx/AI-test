@@ -135,6 +135,12 @@ header h1 {
   border-radius: var(--radius);
   padding: 8px 10px;
 }
+.kol-version-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
 .char-info-row {
   display: flex;
   align-items: center;

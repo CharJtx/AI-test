@@ -27,6 +27,7 @@ const state = {
   worldbooks: [],        // 世界书列表（含条目与关键词）
   characters: [],        // 角色卡列表
   kolCharacters: [],     // KOL 角色卡列表（从 kol-characters.json 加载）
+  kolVersionMap: {},     // KOL 角色选中的版本号: { key -> version number }
   charSource: "local",   // 角色卡来源: "local" | "kol"
   activeCharId: null,    // 当前激活的角色卡 ID（本地为数字 id，KOL 为 key 字符串）
   streaming: false,      // 是否正在进行流式响应
@@ -149,6 +150,8 @@ function setupEvents() {
 
   $btnSrcLocal?.addEventListener("click", () => switchCharSource("local"));
   $btnSrcKol?.addEventListener("click", () => switchCharSource("kol"));
+
+  document.getElementById("kol-version-select")?.addEventListener("change", onKolVersionChange);
 
   // Ctrl+Enter 快捷发送
   $userInput.addEventListener("keydown", (e) => {
@@ -1338,13 +1341,24 @@ async function loadKolCharacters() {
 }
 
 function _kolToChar(entry) {
-  const latest = entry.versions[entry.versions.length - 1].data;
+  const selectedVer = state.kolVersionMap[entry.key];
+  const verObj = selectedVer != null
+    ? entry.versions.find(v => v.version === selectedVer) || entry.versions[entry.versions.length - 1]
+    : entry.versions[entry.versions.length - 1];
   return {
-    ...latest,
+    ...verObj.data,
     id: entry.key,
     _kol: true,
     _kolEntry: entry,
+    _kolVersion: verObj.version,
   };
+}
+
+function onKolVersionChange() {
+  const sel = document.getElementById("kol-version-select");
+  if (!sel || !state.activeCharId) return;
+  state.kolVersionMap[state.activeCharId] = parseInt(sel.value);
+  renderCharInfo();
 }
 
 function switchCharSource(source) {
@@ -1417,6 +1431,26 @@ function renderCharInfo() {
   [$btnRemixChar, $btnEditChar, $btnDeleteChar].forEach(el => {
     if (el) el.style.display = isKol ? "none" : "";
   });
+
+  const $kolVersionBar = document.getElementById("kol-version-bar");
+  const $kolVersionSelect = document.getElementById("kol-version-select");
+  if ($kolVersionBar && $kolVersionSelect) {
+    if (isKol && char._kolEntry && char._kolEntry.versions.length > 1) {
+      $kolVersionBar.hidden = false;
+      const entry = char._kolEntry;
+      $kolVersionSelect.innerHTML = entry.versions
+        .map((v) => {
+          const date = v.created_at ? new Date(v.created_at).toLocaleDateString() : "";
+          const label = `v${v.version}${date ? " (" + date + ")" : ""}`;
+          return `<option value="${v.version}">${escapeHtml(label)}</option>`;
+        })
+        .join("");
+      const current = state.kolVersionMap[entry.key] ?? entry.versions[entry.versions.length - 1].version;
+      $kolVersionSelect.value = current;
+    } else {
+      $kolVersionBar.hidden = true;
+    }
+  }
 
   const tags = char.tags || [];
   $charTags.innerHTML = tags.length > 0
