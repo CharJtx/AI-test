@@ -163,9 +163,16 @@
       <div id="chat-columns" class="chat-columns">
         <div class="placeholder-msg">← 选择模型后开始对话</div>
       </div>
+      <div id="hint-bar" class="hint-bar" style="display:none">
+        <button class="hint-chip" id="hint-chip-0"></button>
+        <button class="hint-chip" id="hint-chip-1"></button>
+      </div>
       <div class="input-bar">
         <textarea id="user-input" rows="3" placeholder="输入消息... (Ctrl+Enter 发送)"></textarea>
-        <button id="btn-send">发送</button>
+        <div class="input-actions">
+          <button id="btn-hint" title="AI 生成输入提示">💡 提示</button>
+          <button id="btn-send">发送</button>
+        </div>
       </div>
     </main>
   </div>

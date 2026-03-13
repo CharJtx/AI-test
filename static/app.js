@@ -43,6 +43,12 @@ const $selectedTags = document.getElementById("selected-tags");
 const $chatColumns = document.getElementById("chat-columns");
 const $userInput = document.getElementById("user-input");
 const $btnSend = document.getElementById("btn-send");
+const $btnHint = document.getElementById("btn-hint");
+const $hintBar = document.getElementById("hint-bar");
+const $hintChips = [
+  document.getElementById("hint-chip-0"),
+  document.getElementById("hint-chip-1"),
+];
 const $btnClear = document.getElementById("btn-clear");
 const $presetSelect = document.getElementById("preset-select");
 const $btnSavePreset = document.getElementById("btn-save-preset");
@@ -116,6 +122,7 @@ function setupEvents() {
   $modelSearch.addEventListener("input", renderModelList);
   $filterUnmoderated.addEventListener("change", renderModelList);
   $btnSend.addEventListener("click", sendMessage);
+  $btnHint.addEventListener("click", generateHints);
   $btnClear.addEventListener("click", clearConversations);
   $btnSaveChat?.addEventListener("click", saveChatDialog);
   $btnLoadChat?.addEventListener("click", openChatHistory);
@@ -349,7 +356,7 @@ function renderMessages(modelId) {
   const msgs = state.conversations[modelId] || [];
   container.innerHTML = msgs
     .map((m, idx) => {
-      const html = m.role === "assistant" ? renderMarkdown(m.content) : escapeHtml(m.content);
+      const html = renderMarkdown(m.content);
       const isFinishedAssistant = m.role === "assistant" && !m._streaming;
       const actions = isFinishedAssistant
         ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button></div>`
@@ -578,32 +585,54 @@ function stopTts() {
  *
  * 这样可以确保嵌套或相邻的不同标记不会互相破坏。
  */
+/**
+ * 渲染 RP 格式文本为 HTML。
+ *
+ * 规则：
+ *   **粗体**          → <strong>
+ *   *动作/描写*        → <span class="rp-action">（紫色斜体）
+ *   其余所有文本       → <span class="rp-dialogue">（橙色，默认视为对话）
+ *
+ * 不再依赖任何引号标记来区分对话，消除与英文缩写（I'm / don't）的冲突。
+ */
 function renderRpContent(text) {
   if (!text) return "";
 
-  let html = escapeHtml(text);
+  const escaped = escapeHtml(text);
+  const result = [];
+  // 匹配 **bold** 或 *action*（不跨换行）
+  const pattern = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*)/g;
+  let lastIndex = 0;
+  let match;
 
-  // Use placeholders to avoid regex matches interfering with each other.
-  // Each match is replaced with \x00idx\x00, then restored after all patterns are processed.
-  const tokens = [];
-  function tokenize(regex, builder) {
-    html = html.replace(regex, (...args) => {
-      const idx = tokens.length;
-      tokens.push(builder(...args));
-      return `\x00${idx}\x00`;
-    });
+  while ((match = pattern.exec(escaped)) !== null) {
+    if (match.index > lastIndex) {
+      result.push(_wrapAsDialogue(escaped.slice(lastIndex, match.index)));
+    }
+    const raw = match[0];
+    if (raw.startsWith("**")) {
+      result.push(`<strong>${raw.slice(2, -2)}</strong>`);
+    } else {
+      result.push(`<span class="rp-action">${raw.slice(1, -1)}</span>`);
+    }
+    lastIndex = match.index + raw.length;
   }
 
-  tokenize(/\*\*(.+?)\*\*/g, (_, c) => `<strong>${c}</strong>`);
-  tokenize(/\*([^*]+?)\*/g, (_, c) => `<span class="rp-action">${c}</span>`);
-  tokenize(/「([^」]+?)」/g, (_, c) => `<span class="rp-dialogue">「${c}」</span>`);
-  tokenize(/\u201c([^\u201d]+?)\u201d/g, (_, c) => `<span class="rp-dialogue">\u201c${c}\u201d</span>`);
-  tokenize(/&quot;([^&]+?)&quot;/g, (_, c) => `<span class="rp-dialogue">&quot;${c}&quot;</span>`);
+  if (lastIndex < escaped.length) {
+    result.push(_wrapAsDialogue(escaped.slice(lastIndex)));
+  }
 
-  html = html.split("\n").join("<br>");
-  html = html.replace(/\x00(\d+)\x00/g, (_, i) => tokens[parseInt(i)]);
+  return result.join("");
+}
 
-  return html;
+/**
+ * 将非动作文本段落按行包裹为 rp-dialogue，保留换行为 <br>。
+ */
+function _wrapAsDialogue(text) {
+  return text.split("\n").map((line) => {
+    const trimmed = line.trim();
+    return trimmed ? `<span class="rp-dialogue">${line}</span>` : line;
+  }).join("<br>");
 }
 
 /**
@@ -639,6 +668,7 @@ async function sendMessage() {
   $btnSend.disabled = true;
   $btnSend.textContent = "生成中...";
   $userInput.value = "";
+  $hintBar.style.display = "none";
 
   const params = getParams();
 
@@ -657,6 +687,71 @@ async function sendMessage() {
   state.streaming = false;
   $btnSend.disabled = false;
   $btnSend.textContent = "发送";
+}
+
+/**
+ * 调用 LLM 生成两条用户输入提示（Hint），展示在输入框上方供用户点击选用。
+ * 点击提示后，内容会填入输入框，提示条随即隐藏。
+ */
+async function generateHints() {
+  if (state.selectedModels.length === 0) {
+    alert("请先选择一个模型再生成提示。");
+    return;
+  }
+
+  const modelId = state.selectedModels[0];
+  const conversation = (state.conversations[modelId] || [])
+    .filter((m) => !m._streaming)
+    .map((m) => ({ role: m.role, content: m.content }));
+  const activeChar = getActiveChar();
+  const rpMode = document.getElementById("rp-format-mode")?.value || "none";
+
+  $btnHint.disabled = true;
+  $hintBar.style.display = "flex";
+  $hintChips.forEach((chip) => {
+    chip.innerHTML = "生成中…";
+    chip.style.display = "";
+    chip.classList.add("loading");
+    chip.onclick = null;
+  });
+
+  try {
+    const resp = await fetch("/api/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        conversation,
+        character: activeChar,
+        user_name: state.userName,
+        rp_format_mode: rpMode,
+      }),
+    });
+
+    const data = await resp.json();
+    const hints = data.hints || [];
+
+    $hintChips.forEach((chip, i) => {
+      chip.classList.remove("loading");
+      const text = hints[i] || "";
+      if (text) {
+        chip.style.display = "";
+        chip.innerHTML = renderRpContent(text);
+        chip.onclick = () => {
+          $userInput.value = text;
+          $userInput.focus();
+          $hintBar.style.display = "none";
+        };
+      } else {
+        chip.style.display = "none";
+      }
+    });
+  } catch (err) {
+    console.error("generateHints error:", err);
+    $hintBar.style.display = "none";
+  } finally {
+    $btnHint.disabled = false;
+  }
 }
 
 /**

@@ -1052,6 +1052,127 @@ async def chat(request: Request):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+# ── 对话输入提示生成（Hint） ──────────────────────────────────
+
+@app.post("/api/hint")
+async def generate_hints(request: Request):
+    """
+    对话输入提示生成接口。
+
+    根据当前对话上下文和角色信息，调用 LLM 生成两条适合用户作为下一轮输入的提示语句。
+    提示内容会遵循前端选定的 RP 格式（rp / dialogue / none）。
+
+    请求体参数:
+        model (str): 用于生成提示的模型 ID
+        conversation (list): 当前对话消息列表
+        character (dict|null): 当前角色卡数据
+        user_name (str): 用户昵称
+        rp_format_mode (str): RP 格式模式 "rp"|"dialogue"|"none"
+    返回:
+        {"hints": ["提示1", "提示2"]}
+    """
+    body = await request.json()
+    model = body.get("model", "openai/gpt-4o-mini")
+    conversation = body.get("conversation", [])
+    character = body.get("character")
+    user_name = body.get("user_name", "用户")
+    rp_mode = body.get("rp_format_mode", "none")
+
+    char_name = character.get("name", "角色") if character else "角色"
+
+    recent_msgs = conversation[-8:] if len(conversation) > 8 else conversation
+    conv_text = "\n".join([
+        f"[{user_name}]: {m['content'][:300]}" if m["role"] == "user"
+        else f"[{char_name}]: {m['content'][:300]}"
+        for m in recent_msgs
+    ])
+
+    # 根据 RP 格式决定用户输入的书写规范（含具体示例）
+    _rp_format_rules = {
+        "rp": (
+            "[User Input Format — RP Mode]\n"
+            "Use *asterisks* ONLY for actions/descriptions. Spoken dialogue is written as plain text — no quotes of any kind.\n"
+            "Example (Chinese): *我缓缓走近，目光落在你身上* 这里……真的只有我们两个人吗？\n"
+            "Example (English): *I step closer, meeting your gaze* Is it really just the two of us here?\n"
+            "NEVER wrap dialogue in quotes, brackets, or any other markers."
+        ),
+        "dialogue": (
+            "[User Input Format — Dialogue Only Mode]\n"
+            "Output ONLY the player's spoken words — no actions, no narration, no asterisks, no brackets, no quotes.\n"
+            "Example (Chinese): 你怎么会在这里？能告诉我你叫什么名字吗？\n"
+            "Example (English): What brings you here? Can you tell me your name?"
+        ),
+    }
+    format_rule = _rp_format_rules.get(rp_mode, "")
+
+    hint_system = (
+        f"You are a roleplay input assistant. The player is interacting with the character named '{char_name}'.\n"
+        "Your task: based on the current conversation context, generate EXACTLY 2 suggestions for what the PLAYER should type next.\n\n"
+        "Rules:\n"
+        "- Suggestions must be from the PLAYER's perspective (first-person), NOT the character's.\n"
+        "- Each suggestion: 20-80 words.\n"
+        "- The two suggestions should differ in tone (e.g. one gentle/curious, one bold/direct).\n"
+        "- Match the language of the conversation (Chinese conversation → Chinese suggestions, English → English).\n"
+        "- Output STRICTLY in this format, nothing else:\n"
+        "1. [first suggestion]\n"
+        "2. [second suggestion]"
+    )
+    if format_rule:
+        hint_system = hint_system + "\n\n" + format_rule
+
+    user_msg = f"当前对话记录（最近几轮）：\n{conv_text}\n\n请生成2条建议。" if conv_text else "对话刚刚开始，请生成2条合适的开场输入建议。"
+
+    messages = [
+        {"role": "system", "content": hint_system},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.9,
+                "max_tokens": 400,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"LLM API error: {resp.status_code} - {resp.text[:200]}"},
+            status_code=502,
+        )
+
+    content = (
+        resp.json()
+        .get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+    hints = []
+    for line in content.split("\n"):
+        line = line.strip()
+        if line and (line.startswith("1.") or line.startswith("2.")):
+            hint = line[2:].strip()
+            if hint:
+                hints.append(hint)
+
+    # 若解析不到两条，按行分割降级处理
+    if len(hints) < 2:
+        lines = [l.strip() for l in content.split("\n") if l.strip()]
+        hints = lines[:2]
+
+    return {"hints": hints}
+
+
 # ── 预设（Presets）CRUD ─────────────────────────────────────
 # 预设存储推理参数组合（temperature、max_tokens 等），供前端快速切换。
 
