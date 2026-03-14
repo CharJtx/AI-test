@@ -391,13 +391,21 @@ function renderMessages(modelId) {
     });
   });
 
-  // 绑定"TTS 朗读"按钮事件
   container.querySelectorAll(".tts-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const mid = btn.dataset.model;
       const i = parseInt(btn.dataset.idx);
-      const text = state.conversations[mid]?.[i]?.content;
-      if (text) speakText(text, btn);
+      const conv = state.conversations[mid] || [];
+      const text = conv[i]?.content;
+      if (!text) return;
+      const isVoice = document.getElementById("rp-format-mode")?.value === "voice";
+      let userCtx = "";
+      if (isVoice) {
+        for (let j = i - 1; j >= 0; j--) {
+          if (conv[j]?.role === "user") { userCtx = conv[j].content; break; }
+        }
+      }
+      speakText(text, btn, { voiceMode: isVoice, userContext: userCtx });
     });
   });
 
@@ -476,26 +484,27 @@ async function loadTtsVoices() {
   try {
     const resp = await fetch("/api/tts/voices");
     const { voices } = await resp.json();
-    const zhVoices = voices.filter((v) => v.locale.startsWith("zh-"));
-    const enVoices = voices.filter((v) => v.locale.startsWith("en-"));
-    const jaVoices = voices.filter((v) => v.locale.startsWith("ja-"));
-    const koVoices = voices.filter((v) => v.locale.startsWith("ko-"));
 
-    function voiceOpts(list, groupLabel) {
-      if (!list.length) return "";
-      return `<optgroup label="${groupLabel}">${list
-        .map((v) => {
-          const label = `${v.name} (${v.gender === "Female" ? "♀" : "♂"})`;
-          return `<option value="${v.id}">${label}</option>`;
-        })
-        .join("")}</optgroup>`;
+    const groups = {};
+    for (const v of voices) {
+      let group;
+      if (v.locale === "multi" && v.id.startsWith("S_")) group = "🎭 InSnap Custom";
+      else if (v.locale === "multi") group = "🌐 Multilingual";
+      else if (v.locale.startsWith("en-")) group = "🇺🇸 English";
+      else if (v.locale.startsWith("ja-")) group = "🇯🇵 Japanese";
+      else if (v.locale.startsWith("zh-")) group = "🇨🇳 Chinese";
+      else group = v.locale;
+      if (!groups[group]) groups[group] = [];
+      groups[group].push(v);
     }
 
-    $voice.innerHTML =
-      voiceOpts(zhVoices, "中文") +
-      voiceOpts(enVoices, "English") +
-      voiceOpts(jaVoices, "日本語") +
-      voiceOpts(koVoices, "한국어");
+    $voice.innerHTML = Object.entries(groups)
+      .map(([label, list]) =>
+        `<optgroup label="${label}">${list
+          .map((v) => `<option value="${v.id}">${v.name} (${v.gender === "Female" ? "♀" : "♂"})</option>`)
+          .join("")}</optgroup>`
+      )
+      .join("");
 
     const saved = localStorage.getItem("ttsVoice");
     if (saved && voices.some((v) => v.id === saved)) $voice.value = saved;
@@ -506,7 +515,7 @@ async function loadTtsVoices() {
 }
 
 function getTtsVoice() {
-  return document.getElementById("tts-voice")?.value || "zh-CN-XiaoxiaoNeural";
+  return document.getElementById("tts-voice")?.value || "";
 }
 
 function getTtsRate() {
@@ -517,7 +526,7 @@ function getTtsRate() {
  * 将文本发送到后端 TTS 接口进行语音合成并播放。
  * 如果当前按钮已在播放状态，则停止播放（切换行为）。
  */
-async function speakText(text, btn) {
+async function speakText(text, btn, { voiceMode = false, userContext = "" } = {}) {
   if (_ttsAudio && _ttsPlayingBtn === btn) {
     stopTts();
     return;
@@ -528,10 +537,17 @@ async function speakText(text, btn) {
   btn.textContent = "⏳";
 
   try {
+    const payload = {
+      text,
+      voice: getTtsVoice(),
+      rate: getTtsRate(),
+      voice_mode: voiceMode,
+      user_context: userContext,
+    };
     const resp = await fetch("/api/tts/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice: getTtsVoice(), rate: getTtsRate() }),
+      body: JSON.stringify(payload),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -640,7 +656,8 @@ function _wrapAsDialogue(text) {
  */
 function renderMarkdown(text) {
   try {
-    return renderRpContent(text);
+    const cleaned = text.replace(/^\s*\[#[^\]]*\]\s*/, "");
+    return renderRpContent(cleaned);
   } catch {
     return escapeHtml(text);
   }
@@ -856,6 +873,21 @@ async function streamChat(modelId, params) {
 
   delete state.conversations[modelId][msgIdx]._streaming;
   renderMessages(modelId);
+
+  if (document.getElementById("rp-format-mode")?.value === "voice") {
+    const finalText = state.conversations[modelId][msgIdx]?.content;
+    if (finalText) {
+      const conv = state.conversations[modelId] || [];
+      let userCtx = "";
+      for (let j = msgIdx - 1; j >= 0; j--) {
+        if (conv[j]?.role === "user") { userCtx = conv[j].content; break; }
+      }
+      const container = document.getElementById(`msgs-${CSS.escape(modelId)}`);
+      const allTtsBtns = container?.querySelectorAll(".tts-btn");
+      const lastBtn = allTtsBtns?.[allTtsBtns.length - 1];
+      if (lastBtn) speakText(finalText, lastBtn, { voiceMode: true, userContext: userCtx });
+    }
+  }
 }
 
 // ── 清除对话 ────────────────────────────────────────────
@@ -2033,6 +2065,131 @@ function openCharEditor(existingChar) {
     renderCharInfo();
   });
 }
+
+// ── TTS Emotion A/B 测试 ─────────────────────────────────
+(function initEmotionTest() {
+  const btn = document.getElementById("btn-tts-emotion-test");
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    const existing = document.getElementById("emotion-test-overlay");
+    if (existing) existing.remove();
+
+    let emotions = [];
+    try {
+      const r = await fetch("/api/tts/emotions");
+      const d = await r.json();
+      emotions = d.emotions || [];
+    } catch { emotions = ["affectionate","angry","ASMR","chat","excited","happy","neutral","warm","sad"]; }
+
+    const overlay = document.createElement("div");
+    overlay.id = "emotion-test-overlay";
+    Object.assign(overlay.style, {
+      position:"fixed", inset:"0", background:"rgba(0,0,0,.6)", zIndex:"9999",
+      display:"flex", alignItems:"center", justifyContent:"center",
+    });
+
+    const panel = document.createElement("div");
+    Object.assign(panel.style, {
+      background:"var(--surface,#1e1e2e)", borderRadius:"12px", padding:"20px",
+      width:"520px", maxHeight:"80vh", overflowY:"auto", color:"var(--text,#cdd6f4)",
+      boxShadow:"0 8px 32px rgba(0,0,0,.5)",
+    });
+
+    panel.innerHTML = `
+      <h3 style="margin:0 0 12px;font-size:16px">🎭 Emotion A/B 测试</h3>
+      <textarea id="emo-test-text" rows="3" placeholder="输入要朗读的文本..."
+        style="width:100%;box-sizing:border-box;padding:8px;font-size:13px;border-radius:6px;border:1px solid var(--border,#45475a);background:var(--bg,#11111b);color:var(--text,#cdd6f4);resize:vertical;margin-bottom:12px"
+      >Merry Christmas, hmm, you like? I wrapped myself up just for you. Come unwrap your present.</textarea>
+      <div id="emo-btn-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+        <button id="emo-play-all" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border,#45475a);background:var(--accent,#cba6f7);color:#11111b;cursor:pointer;font-size:13px;font-weight:600">▶ 全部依次播放</button>
+        <span id="emo-status" style="font-size:12px;color:var(--text-muted,#6c7086)"></span>
+        <button id="emo-close" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border,#45475a);background:var(--surface,#1e1e2e);color:var(--text,#cdd6f4);cursor:pointer;font-size:13px">关闭</button>
+      </div>
+    `;
+
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    const grid = panel.querySelector("#emo-btn-grid");
+    const status = panel.querySelector("#emo-status");
+    let currentAudio = null;
+    let abortAll = false;
+
+    for (const emo of emotions) {
+      const b = document.createElement("button");
+      b.textContent = emo;
+      b.dataset.emotion = emo;
+      Object.assign(b.style, {
+        padding:"8px 4px", borderRadius:"6px", border:"1px solid var(--border,#45475a)",
+        background:"var(--bg,#11111b)", color:"var(--text,#cdd6f4)", cursor:"pointer",
+        fontSize:"12px", transition:"all .15s",
+      });
+      b.addEventListener("click", () => playSingle(emo, b));
+      grid.appendChild(b);
+    }
+
+    async function playSingle(emotion, b) {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      const text = panel.querySelector("#emo-test-text").value.trim();
+      if (!text) { status.textContent = "请输入文本"; return; }
+
+      const allBtns = grid.querySelectorAll("button");
+      allBtns.forEach(x => { x.style.background = "var(--bg,#11111b)"; x.style.color = "var(--text,#cdd6f4)"; });
+      b.style.background = "var(--accent,#cba6f7)";
+      b.style.color = "#11111b";
+      status.textContent = `正在合成 ${emotion}...`;
+
+      try {
+        const resp = await fetch("/api/tts/speak-emotion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice: getTtsVoice(), emotion }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          status.textContent = `${emotion}: ${err.error || resp.status}`;
+          return;
+        }
+        const blob = await resp.blob();
+        currentAudio = new Audio(URL.createObjectURL(blob));
+        status.textContent = `▶ ${emotion}`;
+        await new Promise((resolve, reject) => {
+          currentAudio.addEventListener("ended", resolve);
+          currentAudio.addEventListener("error", reject);
+          currentAudio.play();
+        });
+        status.textContent = `${emotion} ✓`;
+      } catch (e) {
+        status.textContent = `${emotion}: ${e.message || "error"}`;
+      }
+    }
+
+    panel.querySelector("#emo-play-all").addEventListener("click", async () => {
+      abortAll = false;
+      const text = panel.querySelector("#emo-test-text").value.trim();
+      if (!text) { status.textContent = "请输入文本"; return; }
+      const btns = [...grid.querySelectorAll("button")];
+      for (let i = 0; i < btns.length; i++) {
+        if (abortAll) break;
+        await playSingle(btns[i].dataset.emotion, btns[i]);
+        if (abortAll) break;
+        await new Promise(r => setTimeout(r, 300));
+      }
+      if (!abortAll) status.textContent = "全部播放完成 ✓";
+    });
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    panel.querySelector("#emo-close").addEventListener("click", close);
+
+    function close() {
+      abortAll = true;
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      overlay.remove();
+    }
+  });
+})();
 
 // ── 启动应用 ────────────────────────────────────────────
 init();

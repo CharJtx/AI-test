@@ -6,7 +6,7 @@ AI 角色扮演系统后端服务器
 - 角色头像提示词生成与改写
 - 聊天消息的流式补全（SSE）
 - 世界书（Worldbook）、预设（Preset）、聊天记录的持久化管理
-- Edge-TTS 语音合成
+- 火山引擎（BytePlus）TTS 语音合成
 - Playground 场景资源管理
 - 静态前端文件托管
 
@@ -16,14 +16,16 @@ AI 角色扮演系统后端服务器
 # ── 标准库导入 ──────────────────────────────────────────────
 import io
 import json
+import logging
 import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 # ── 第三方库导入 ────────────────────────────────────────────
-import edge_tts
+import base64
 import httpx
+import uuid
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +37,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # 从 .env 文件加载环境变量（主要是 OPENROUTER_API_KEY）
 load_dotenv()
+
+logger = logging.getLogger("tts")
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI()
 
@@ -412,8 +417,6 @@ Requirements:
 Return ONLY valid JSON with the same structure as a standard character card (name, description, personality, scenario, first_mes, mes_example, system_prompt, creator_notes, tags, character_book with entries)."""
 
 
-import base64  # noqa: E402
-import io  # noqa: E402
 from PIL import Image  # noqa: E402
 
 
@@ -786,74 +789,599 @@ async def generate_image_prompt(request: Request):
     return {"prompt": prompt}
 
 
-# ── TTS 语音合成（Edge-TTS）────────────────────────────────
+# ── TTS 语音合成（火山引擎 / BytePlus）─────────────────────
 
-# 语音列表缓存，避免每次请求都调用 edge_tts.list_voices()
-_tts_voices_cache: list[dict] | None = None
+VOLC_TTS_URL = os.getenv(
+    "VOLC_TTS_URL",
+    "https://voice.ap-southeast-1.bytepluses.com/api/v3/tts/unidirectional",
+)
+VOLC_TTS_APP_ID = os.getenv("VOLC_TTS_APP_ID", "")
+VOLC_TTS_ACCESS_KEY = os.getenv("VOLC_TTS_ACCESS_KEY", "")
+VOLC_TTS_API_KEY = os.getenv("VOLC_TTS_API_KEY", "")
+VOLC_TTS_APP_KEY = "aGjiRDfUWi"
+
+_R10 = "volc.service_type.1000009"  # TTS 1.0
+_R20 = "seed-tts-2.0"              # TTS 2.0 (supports context_texts)
+_RMG = "volc.megatts.default"      # Voice Replication
+
+VOLC_TTS_VOICES = [
+    # ═══════════════════ TTS 2.0 Female (English) ═══════════════════
+    {"id": "en_female_stokie_uranus_bigtts",  "name": "Stokie (Clear)",  "locale": "en-US", "gender": "Female", "resource_id": _R20},
+    {"id": "en_female_dacey_uranus_bigtts",   "name": "Dacey (Sweet)",   "locale": "en-US", "gender": "Female", "resource_id": _R20},
+    # ═══════════════════ TTS 2.0 Female (Japanese) ═══════════════════
+    {"id": "jp_female_minimi_uranus_bigtts",   "name": "Minimi (Clear)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R20},
+    # ═══════════════════ TTS 2.0 Female (Chinese / Multi) ═══════════════════
+    {"id": "zh_female_vv_uranus_bigtts",              "name": "Vivi (Vivid)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_xiaohe_uranus_bigtts",          "name": "Mindy (Vivid)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_kefunvsheng_uranus_bigtts",     "name": "Tracy (Warm)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_linjianvhai_uranus_bigtts",     "name": "Pinky (Sweet)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_kiwi_uranus_bigtts",            "name": "Sweety (Vivid)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_sajiaoxuemei_uranus_bigtts",    "name": "Sandy (Sweet)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
+
+    # ═══════════════════ TTS 1.0 Female — Emotion (English) ═══════════════════
+    {"id": "en_female_candice_emo_v2_mars_bigtts",      "name": "Candice (Warm)",    "locale": "en-US", "gender": "Female", "resource_id": _R10,
+     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm"]},
+    {"id": "en_female_skye_emo_v2_mars_bigtts",         "name": "Serena (Vivid)",    "locale": "en-US", "gender": "Female", "resource_id": _R10,
+     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm", "sad"]},
+    {"id": "en_female_nadia_tips_emo_v2_mars_bigtts",   "name": "Nadia (Sweet)",     "locale": "en-GB", "gender": "Female", "resource_id": _R10,
+     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm", "sad"]},
+
+    # ═══════════════════ TTS 1.0 Female — General (American English) ═══════════════════
+    {"id": "en_female_anna_mars_bigtts",                "name": "Anna (Soft)",           "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_lauren_moon_bigtts",              "name": "Lauren (Vivid)",        "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_product_darcie_moon_bigtts",      "name": "Flirty Female (Warm)",  "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_emotional_moon_bigtts",           "name": "Peaceful (Sweet)",      "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_nara_moon_bigtts",                "name": "Nara (Deep)",           "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_sophie_conversation_wvae_bigtts", "name": "Sophie (Warm)",         "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_dacey_conversation_wvae_bigtts",  "name": "Daisy (Clear)",         "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_sarah_new_conversation_wvae_bigtts", "name": "Luna (Elegant)",     "locale": "en-US", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_en_female_cc_cm_v1_tob",                "name": "Charlie (Vivid)",       "locale": "en-US", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ TTS 1.0 Female — General (British / Australian English) ═══════════════════
+    {"id": "en_female_daisy_moon_bigtts",    "name": "Delicate Girl (Clear)", "locale": "en-GB", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_onez_moon_bigtts",     "name": "Onez (Soft)",           "locale": "en-GB", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_emily_mars_bigtts",    "name": "Emily (Soft)",          "locale": "en-GB", "gender": "Female", "resource_id": _R10},
+    {"id": "en_female_sarah_mars_bigtts",    "name": "Sarah (Soft)",          "locale": "en-AU", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ TTS 1.0 Female — Emotion (English & Chinese) ═══════════════════
+    {"id": "zh_female_shuangkuaisisi_emo_v2_mars_bigtts", "name": "Elena (Vivid)", "locale": "multi", "gender": "Female", "resource_id": _R10,
+     "emotions": ["happy", "sad", "angry", "surprised", "excited", "coldness", "neutral"]},
+
+    # ═══════════════════ TTS 1.0 Female — General (English & Chinese) ═══════════════════
+    {"id": "zh_female_shaoergushi_mars_bigtts",    "name": "Tina (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_jitangmeimei_mars_bigtts",   "name": "Grace (Soft)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_tiexinnvsheng_mars_bigtts",  "name": "Sophia (Warm)",   "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_qiaopinvsheng_mars_bigtts",  "name": "Mia (Vivid)",     "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_mengyatou_mars_bigtts",      "name": "Ava (Vivid)",     "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_cancan_mars_bigtts",         "name": "Luna (Clear)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_qingxinnvsheng_mars_bigtts", "name": "Olivia (Clear)",  "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_linjia_mars_bigtts",         "name": "Lily (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_shuangkuaisisi_moon_bigtts", "name": "Aria (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ TTS 1.0 Female — Emotion (Chinese) ═══════════════════
+    {"id": "zh_female_tianxinxiaomei_emo_v2_mars_bigtts",  "name": "甜心小美 (Sweet)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
+     "emotions": ["sad", "fear", "hate", "neutral"]},
+    {"id": "zh_female_gaolengyujie_emo_v2_mars_bigtts",   "name": "高冷御姐 (Mature)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
+     "emotions": ["happy", "sad", "fear", "hate", "neutral", "angry", "surprised", "excited", "coldness"]},
+    {"id": "zh_female_linjuayi_emo_v2_mars_bigtts",       "name": "邻居阿姨 (Soft)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
+     "emotions": ["neutral", "angry", "coldness", "depressed", "surprised"]},
+
+    # ═══════════════════ TTS 1.0 Female — Flirt (Chinese) ═══════════════════
+    {"id": "zh_female_jiaochuan_mars_bigtts",               "name": "娇喘女声 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_flattery_mars_bigtts",                "name": "谄媚女声 (Vivid)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_chunzhenshaonv_e588402fb8ad_tob", "name": "纯真少女 (Mature)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_ganli_v1_tob",                    "name": "妩媚可人 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_xiangliangya_v1_tob",             "name": "邪魅御姐 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_bingjiao3_tob",                   "name": "邪魅女王 (Charming)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_meilinvyou_moon_bigtts",              "name": "魅力女友 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_sajiaonvyou_moon_bigtts",             "name": "柔美女友 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_yuanqinvyou_moon_bigtts",             "name": "撒娇学妹 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_bingruoshaonv_tob",               "name": "病弱少女 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_jiaoruoluoli_tob",                "name": "娇弱萝莉 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_bingjiaomengmei_tob",             "name": "病娇萌妹 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_aojiaonvyou_tob",                 "name": "傲娇女友 (Scheming)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "ICL_zh_female_tiexinnvyou_tob",                 "name": "贴心女友 (Warm)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ TTS 1.0 Female — General (Chinese) ═══════════════════
+    {"id": "zh_female_wenroushunv_mars_bigtts",   "name": "温柔淑女 (Soft)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_gaolengyujie_moon_bigtts",  "name": "高冷御姐 (Clear)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_linjianvhai_moon_bigtts",   "name": "邻家女孩 (Clear)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_yueyunv_mars_bigtts",       "name": "温柔粤语 (Warm)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_daimengchuanmei_moon_bigtts","name": "呆萌川妹 (Cute)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+    {"id": "zh_female_wanwanxiaohe_moon_bigtts",  "name": "台湾小何 (Vivid)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ TTS 1.0 Female — Japanese ═══════════════════
+    {"id": "multi_female_shuangkuaisisi_moon_bigtts",        "name": "はるこ Haruko (Vivid)", "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
+    {"id": "multi_female_gaolengyujie_moon_bigtts",          "name": "あけみ Akemi (Clear)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
+    {"id": "multi_female_sophie_conversation_wvae_bigtts",   "name": "さとみ Satomi (Soft)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
+    {"id": "multi_female_maomao_conversation_wvae_bigtts",   "name": "つき Tsuki (Clear)",    "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
+
+    # ═══════════════════ InSnap Custom (Voice Replication) ═══════════════════
+    {"id": "S_RGTt9JrD1", "name": "KittyKi",        "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_HvAt9JrD1", "name": "Makima",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_D9oEZIrD1", "name": "Evelyn",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_VS8vZIrD1", "name": "Ashley",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_52VuZIrD1", "name": "Sofia",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_1YTuZIrD1", "name": "Yulia",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_73FuZIrD1", "name": "Warm Voice",      "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_xm4caKqD1", "name": "Magnetic Voice",  "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_lYsxK5IC1", "name": "Sweet Voice",     "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_xgb9isQD1", "name": "Sexy On Bed",     "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_rfcVkzUP1", "name": "Ariana",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_5mlrvs5Q1", "name": "Narration Only",  "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_frvOUiuQ1", "name": "Alice",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
+]
+
+_volc_voice_map: dict[str, dict] = {v["id"]: v for v in VOLC_TTS_VOICES}
 
 
 @app.get("/api/tts/voices")
 async def list_tts_voices():
-    """
-    获取可用的 TTS 语音列表。
-
-    首次调用时从 Edge-TTS 服务拉取并缓存，后续请求直接返回缓存。
-    返回: {"voices": [{"id", "name", "locale", "gender"}, ...]}
-    """
-    global _tts_voices_cache
-    if _tts_voices_cache is None:
-        voices = await edge_tts.list_voices()
-        _tts_voices_cache = [
-            {"id": v["ShortName"], "name": v["FriendlyName"],
-             "locale": v["Locale"], "gender": v["Gender"]}
-            for v in voices
+    """返回所有可用的火山引擎 TTS 音色列表。"""
+    return {
+        "voices": [
+            {"id": v["id"], "name": v["name"], "locale": v["locale"], "gender": v["gender"]}
+            for v in VOLC_TTS_VOICES
         ]
-    return {"voices": _tts_voices_cache}
+    }
+
+
+TTS_ALL_EMOTIONS = [
+    "affectionate", "angry", "ASMR", "authoritative", "chat",
+    "excited", "happy", "neutral", "warm", "sad",
+]
+
+
+@app.get("/api/tts/emotions")
+async def list_tts_emotions():
+    """返回所有可用的 emotion 标签。"""
+    return {"emotions": TTS_ALL_EMOTIONS}
+
+
+@app.post("/api/tts/speak-emotion")
+async def tts_speak_with_emotion(request: Request):
+    """用指定的 emotion 标签朗读文本（用于 A/B 测试）。"""
+    body = await request.json()
+    text = body.get("text", "")
+    voice_id = body.get("voice", "")
+    emotion_tag = body.get("emotion", "")
+
+    if not text.strip():
+        return JSONResponse({"error": "text is required"}, status_code=400)
+    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_ID or not VOLC_TTS_ACCESS_KEY):
+        return JSONResponse({"error": "TTS credentials not configured"}, status_code=500)
+
+    voice_info = _volc_voice_map.get(voice_id)
+    resource_id = voice_info["resource_id"] if voice_info else _R10
+
+    additions: dict = {
+        "disable_markdown_filter": True,
+        "enable_language_detector": True,
+    }
+
+    audio_params: dict = {"format": "mp3", "sample_rate": 24000}
+    if emotion_tag:
+        audio_params["emotion"] = emotion_tag
+
+    headers: dict[str, str] = {
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-App-Key": VOLC_TTS_APP_KEY,
+        "Content-Type": "application/json",
+        "Connection": "keep-alive",
+    }
+    if VOLC_TTS_API_KEY:
+        headers["X-Api-Key"] = VOLC_TTS_API_KEY
+    else:
+        headers["X-Api-App-Id"] = VOLC_TTS_APP_ID
+        headers["X-Api-Access-Key"] = VOLC_TTS_ACCESS_KEY
+
+    payload = {
+        "user": {"uid": "playground_user"},
+        "req_params": {
+            "text": _sanitize_for_tts(text),
+            "speaker": voice_id,
+            "additions": json.dumps(additions),
+            "audio_params": audio_params,
+        },
+    }
+
+    logger.info("═══ TTS EMOTION TEST ═══  speaker=%s  emotion=%s  text=%s", voice_id, emotion_tag, text[:100])
+
+    audio_data = bytearray()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("POST", VOLC_TTS_URL, json=payload, headers=headers) as resp:
+                if resp.status_code != 200:
+                    err_body = ""
+                    async for chunk in resp.aiter_text():
+                        err_body += chunk
+                        if len(err_body) > 500:
+                            break
+                    return JSONResponse(
+                        {"error": f"TTS API HTTP error: {resp.status_code}", "detail": err_body[:500]},
+                        status_code=502,
+                    )
+                async for line in resp.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    code = data.get("code", -1)
+                    if code == 20000000:
+                        break
+                    if code > 0:
+                        return JSONResponse({"error": f"TTS error {code}: {data.get('message', '')}"}, status_code=502)
+                    if code == 0 and data.get("data"):
+                        audio_data.extend(base64.b64decode(data["data"]))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    if not audio_data:
+        return JSONResponse({"error": "empty audio"}, status_code=502)
+
+    return Response(content=bytes(audio_data), media_type="audio/mpeg",
+                    headers={"Content-Disposition": "inline; filename=tts.mp3"})
 
 
 def _strip_rp_markers(text: str) -> str:
-    """Remove markdown-style RP action markers and angle bracket tags for cleaner TTS.
-
-    角色扮演文本中的 *动作描写* 和 <标签> 不适合朗读，此处将其清理为纯文本。
-    """
+    """Remove markdown-style RP action markers and angle bracket tags for cleaner TTS."""
     text = re.sub(r'\*([^*]+)\*', r'\1', text)
     text = re.sub(r'<[^>]+>', '', text)
     return text.strip()
 
 
+# ── 语音指令解析与兜底 ───────────────────────────────────
+
+_VOICE_INSTRUCTION_RE = re.compile(r'^\s*\[#([^\]]+)\]\s*')
+
+_INTIMATE_KEYWORDS = re.compile(
+    r'嗯啊|啊啊|哈啊|呻吟|喘息|好舒服|不要停|用力|ah\.\.\.|mmm|moan|gasp|'
+    r'don.t stop|harder|feels? so good|right there',
+    re.IGNORECASE,
+)
+_FLIRT_KEYWORDS = re.compile(
+    r'撒娇|调戏|偷看|亲一个|好喜欢|小坏蛋|讨厌啦|blush|flirt|tease|wink|kiss|'
+    r'checking.* out|so cute|你好坏',
+    re.IGNORECASE,
+)
+_SAD_KEYWORDS = re.compile(
+    r'对不起|难过|伤心|眼泪|哭|分开|sorry|sad|tears|cry|miss you|goodbye',
+    re.IGNORECASE,
+)
+_ANGRY_KEYWORDS = re.compile(
+    r'生气|混蛋|滚|讨厌你|吵架|angry|shut up|furious|damn|idiot|piss',
+    re.IGNORECASE,
+)
+_SHY_KEYWORDS = re.compile(
+    r'害羞|脸红|不好意思|笨蛋|才不是|shy|embarrass|blush|dummy|it.s not like',
+    re.IGNORECASE,
+)
+
+
+def _infer_voice_instruction(text: str, user_context: str = "") -> str:
+    """Analyze text content and infer a suitable TTS voice instruction as fallback."""
+    combined = text + " " + user_context
+    is_chinese = bool(re.search(r'[\u4e00-\u9fff]', text))
+
+    if _INTIMATE_KEYWORDS.search(combined):
+        return "用喘息低语、情动的语气" if is_chinese else "breathily, with soft moans and gasps"
+    if _FLIRT_KEYWORDS.search(combined):
+        return "用撒娇俏皮的语气" if is_chinese else "in a flirty, playful tone"
+    if _SHY_KEYWORDS.search(combined):
+        return "用害羞小声的语气" if is_chinese else "shyly, voice soft and small"
+    if _SAD_KEYWORDS.search(combined):
+        return "用温柔带点伤感的语气" if is_chinese else "gently, with a hint of sadness"
+    if _ANGRY_KEYWORDS.search(combined):
+        return "用生气的语气" if is_chinese else "angrily, raising voice"
+    return "用自然的语气" if is_chinese else "in a natural tone"
+
+
+def _extract_voice_instruction(text: str) -> tuple[str, str]:
+    """Extract [#instruction] prefix from text.
+
+    Returns (instruction, remaining_text).
+    If no instruction found, returns ("", original_text).
+    """
+    m = _VOICE_INSTRUCTION_RE.match(text)
+    if m:
+        return m.group(1).strip(), text[m.end():].strip()
+    return "", text.strip()
+
+
+def _sanitize_for_tts(text: str) -> str:
+    """Clean up text for TTS: remove RP markers, stray formatting, control chars."""
+    text = _strip_rp_markers(text)
+    text = re.sub(r'[「」『』""【】\[\]]', '', text)
+    text = re.sub(r'[*_~`#>]', '', text)
+    text = re.sub(r'\([^)]*\)', '', text)
+    text = re.sub(r'（[^）]*）', '', text)
+    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+
+    # Replace ellipsis variants with comma-pause so TTS won't spell out "dot dot dot"
+    text = text.replace('…', ', ')
+    text = re.sub(r'\.{2,}', ', ', text)
+
+    # Em/en dashes → comma pause
+    text = re.sub(r'[—–]{1,}', ', ', text)
+    text = text.replace('--', ', ')
+
+    # Non-word interjections that TTS would spell out letter-by-letter
+    text = re.sub(r'\bm{2,}\b', 'hmm', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bh{2,}m+\b', 'hmm', text, flags=re.IGNORECASE)
+    text = re.sub(r'\ba{2,}h+\b', 'aah', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bo{2,}h*\b', 'ooh', text, flags=re.IGNORECASE)
+    text = re.sub(r'\buh{2,}\b', 'uh', text, flags=re.IGNORECASE)
+    text = re.sub(r'\behh+\b', 'eh', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bhah+\b', 'ha', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bngh+\b', 'ng', text, flags=re.IGNORECASE)
+
+    # Collapse repeated commas/spaces from above replacements
+    text = re.sub(r'[,\s]{2,}', ', ', text)
+    text = re.sub(r'\n{2,}', '\n', text)
+    text = re.sub(r' {3,}', ' ', text)
+    return text.strip()
+
+
+def _build_tts_text(
+    raw_text: str,
+    voice_mode: bool = False,
+) -> str:
+    """Build the final text to send to TTS engine.
+
+    For voice mode: extract [#instruction] prefix and return clean speech body.
+    For non-voice mode: simply clean the text of RP markers.
+    """
+    if not voice_mode:
+        return _sanitize_for_tts(raw_text)
+
+    _instruction, body = _extract_voice_instruction(raw_text)
+    body = _sanitize_for_tts(body)
+    return body
+
+
+_EMOTION_MAP: dict[str, str] = {
+    "flirt": "affectionate",
+    "tease": "affectionate",
+    "intimate": "affectionate",
+    "love": "affectionate",
+    "tender": "affectionate",
+    "sweet": "affectionate",
+    "gentle": "affectionate",
+    "breathy": "ASMR",
+    "whisper": "ASMR",
+    "moan": "ASMR",
+    "gasp": "ASMR",
+    "seductive": "ASMR",
+    "sexy": "ASMR",
+    "asmr": "ASMR",
+    "playful": "happy",
+    "laugh": "happy",
+    "happy": "happy",
+    "cheerful": "happy",
+    "excited": "excited",
+    "energetic": "excited",
+    "sad": "sad",
+    "cry": "sad",
+    "tear": "sad",
+    "angry": "angry",
+    "furious": "angry",
+    "warm": "warm",
+    "cozy": "warm",
+    "chat": "chat",
+    "casual": "chat",
+    "撒娇": "affectionate",
+    "俏皮": "happy",
+    "开心": "happy",
+    "兴奋": "excited",
+    "伤心": "sad",
+    "生气": "angry",
+    "温柔": "warm",
+    "喘息": "ASMR",
+    "低语": "ASMR",
+    "情动": "affectionate",
+    "害羞": "affectionate",
+}
+
+
+def _infer_emotion(instruction: str, text: str, voice_info: dict | None = None) -> str | None:
+    """Map voice instruction / text keywords to a V3 audio_params.emotion value.
+
+    If the voice has a restricted emotion set, only return a supported emotion.
+    """
+    combined = (instruction + " " + text).lower()
+    supported = voice_info.get("emotions") if voice_info else None
+
+    for keyword, emotion in _EMOTION_MAP.items():
+        if keyword in combined:
+            if supported is None or emotion in supported:
+                return emotion
+            for fallback in ["affectionate", "warm", "chat", "happy", "neutral"]:
+                if fallback in supported:
+                    return fallback
+            return supported[0] if supported else None
+    return None
+
+
+def _build_context_texts(
+    raw_text: str,
+    user_context: str = "",
+    voice_mode: bool = False,
+) -> list[str] | None:
+    """Build context_texts for V3 API (TTS 2.0 voices only).
+
+    Returns a list with one instruction string, or None if not applicable.
+    """
+    if not voice_mode:
+        return None
+
+    instruction, body = _extract_voice_instruction(raw_text)
+    body_clean = _sanitize_for_tts(body)
+
+    if not instruction:
+        instruction = _infer_voice_instruction(body_clean, user_context)
+
+    return [instruction] if instruction else None
+
+
+def _parse_speech_rate(rate_str: str) -> int:
+    """Convert frontend rate string like '+25%' / '-50%' to V3 speech_rate [-50, 100].
+
+    V3 range: -50 = 0.5x, 0 = 1x, 100 = 2x.
+    Frontend sends percentage offsets like '+25%' meaning 25% faster.
+    """
+    try:
+        pct = int(rate_str.replace("%", "").replace("+", ""))
+        return max(-50, min(100, pct))
+    except (ValueError, TypeError):
+        return 0
+
+
 @app.post("/api/tts/speak")
 async def tts_speak(request: Request):
-    """
-    将文本转换为语音（MP3 格式）。
+    """BytePlus Seed Speech V3 TTS — unidirectional HTTP streaming.
 
     请求体参数:
         text (str): 要朗读的文本
-        voice (str): Edge-TTS 语音 ID（默认中文晓晓）
-        rate (str): 语速调整（如 "+20%"）
-        pitch (str): 音调调整（如 "+5Hz"）
+        voice (str): 音色 ID (speaker)
+        rate (str): 语速调整（如 "+25%"，映射到 speech_rate [-50,100]）
+        voice_mode (bool): 是否为语音聊天模式
+        user_context (str): 用户最后一条消息（用于 context_texts）
     返回: audio/mpeg 二进制音频流
     """
     body = await request.json()
     text = body.get("text", "")
-    voice = body.get("voice", "zh-CN-XiaoxiaoNeural")
+    voice_id = body.get("voice", VOLC_TTS_VOICES[0]["id"] if VOLC_TTS_VOICES else "")
     rate = body.get("rate", "+0%")
-    pitch = body.get("pitch", "+0Hz")
+    voice_mode = body.get("voice_mode", False)
+    user_context = body.get("user_context", "")
 
     if not text.strip():
         return JSONResponse({"error": "text is required"}, status_code=400)
+    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_ID or not VOLC_TTS_ACCESS_KEY):
+        return JSONResponse({"error": "TTS credentials not configured"}, status_code=500)
 
-    clean_text = _strip_rp_markers(text)
-    communicate = edge_tts.Communicate(clean_text, voice, rate=rate, pitch=pitch)
+    final_text = _build_tts_text(text, voice_mode=voice_mode)
+    if not final_text:
+        return JSONResponse({"error": "no speakable content after cleanup"}, status_code=400)
 
-    # 将流式音频块收集到内存缓冲区后一次性返回
-    buf = io.BytesIO()
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            buf.write(chunk["data"])
+    voice_info = _volc_voice_map.get(voice_id)
+    resource_id = voice_info["resource_id"] if voice_info else "volc.service_type.1000009"
 
-    buf.seek(0)
+    # ── Extract voice instruction for emotion inference ──
+    instruction, _ = _extract_voice_instruction(text)
+    if not instruction and voice_mode:
+        instruction = _infer_voice_instruction(final_text, user_context)
+
+    # ── V3 additions ──
+    additions: dict = {
+        "disable_markdown_filter": True,
+        "enable_language_detector": True,
+        "max_length_to_filter_parenthesis": 0,
+    }
+
+    speech_rate = _parse_speech_rate(rate)
+    if speech_rate != 0:
+        additions["speech_rate"] = speech_rate
+
+    context_texts = _build_context_texts(text, user_context, voice_mode)
+    if context_texts:
+        additions["context_texts"] = context_texts
+
+    # ── V3 audio_params with emotion ──
+    audio_params: dict = {
+        "format": "mp3",
+        "sample_rate": 24000,
+    }
+
+    emotion = _infer_emotion(instruction or "", final_text, voice_info) if voice_mode else None
+    if emotion:
+        audio_params["emotion"] = emotion
+
+    # ── V3 request headers ──
+    headers: dict[str, str] = {
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-App-Key": VOLC_TTS_APP_KEY,
+        "Content-Type": "application/json",
+        "Connection": "keep-alive",
+    }
+    if VOLC_TTS_API_KEY:
+        headers["X-Api-Key"] = VOLC_TTS_API_KEY
+    else:
+        headers["X-Api-App-Id"] = VOLC_TTS_APP_ID
+        headers["X-Api-Access-Key"] = VOLC_TTS_ACCESS_KEY
+
+    # ── V3 request body ──
+    payload = {
+        "user": {"uid": "playground_user"},
+        "req_params": {
+            "text": final_text,
+            "speaker": voice_id,
+            "additions": json.dumps(additions),
+            "audio_params": audio_params,
+        },
+    }
+
+    # ── Logging ──
+    logger.info("═══ TTS REQUEST ═══")
+    logger.info("  Raw input text (first 200): %s", text[:200])
+    logger.info("  Voice mode: %s | Speaker: %s | Resource-Id: %s", voice_mode, voice_id, resource_id)
+    logger.info("  Extracted instruction: %s", instruction or "(none)")
+    logger.info("  Inferred emotion: %s", emotion or "(none)")
+    logger.info("  context_texts: %s", context_texts)
+    logger.info("  Final TTS text (first 300): %s", final_text[:300])
+    logger.info("  additions: %s", json.dumps(additions, ensure_ascii=False))
+    logger.info("  audio_params: %s", audio_params)
+
+    # ── Stream response & collect audio chunks ──
+    audio_data = bytearray()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream(
+                "POST", VOLC_TTS_URL, json=payload, headers=headers,
+            ) as resp:
+                if resp.status_code != 200:
+                    err_body = ""
+                    async for chunk in resp.aiter_text():
+                        err_body += chunk
+                        if len(err_body) > 500:
+                            break
+                    return JSONResponse(
+                        {"error": f"TTS API HTTP error: {resp.status_code}", "detail": err_body[:500]},
+                        status_code=502,
+                    )
+
+                async for line in resp.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    code = data.get("code", -1)
+                    if code == 20000000:
+                        break
+                    if code > 0:
+                        msg = data.get("message", "unknown error")
+                        return JSONResponse(
+                            {"error": f"TTS API error {code}: {msg}"},
+                            status_code=502,
+                        )
+                    if code == 0 and data.get("data"):
+                        audio_data.extend(base64.b64decode(data["data"]))
+
+    except httpx.TimeoutException:
+        return JSONResponse({"error": "TTS API request timed out"}, status_code=504)
+    except Exception as e:
+        return JSONResponse({"error": f"TTS request failed: {e}"}, status_code=502)
+
+    if not audio_data:
+        return JSONResponse({"error": "TTS returned empty audio"}, status_code=502)
+
     return Response(
-        content=buf.read(),
+        content=bytes(audio_data),
         media_type="audio/mpeg",
         headers={"Content-Disposition": "inline; filename=tts.mp3"},
     )
@@ -879,6 +1407,46 @@ RP_INSTRUCTIONS = {
         "- Write dialogue directly, no quotation marks or speaker labels. / 直接书写对话，不需要引号或标签。\n"
         "- If silent, output a brief vocal reaction (sigh, hum). / 沉默时用简短语气词代替（叹息、轻哼）。\n"
         "- Never use asterisks or parentheses for actions. / 绝不用星号或括号描写动作。"
+    ),
+    "voice": (
+        "[Response Format — Voice Chat Mode / 语音聊天模式]\n"
+        "You are having a LIVE VOICE conversation. Your output will be converted to speech by TTS engine.\n"
+        "你正在进行实时语音对话。你的输出会被 TTS 引擎转换成语音。\n\n"
+        "=== VOICE INSTRUCTION PREFIX (MANDATORY) ===\n"
+        "You MUST start EVERY response with a TTS voice instruction prefix in the format: [#instruction]\n"
+        "This prefix controls HOW the TTS engine speaks your text (emotion, tone, style).\n"
+        "Choose the instruction based on the character's current emotional state in the conversation.\n\n"
+        "Instruction examples (pick/combine what fits the moment):\n"
+        "- Flirty/teasing: [#用撒娇俏皮的语气] or [#in a flirty, playful tone]\n"
+        "- Intimate/whisper: [#用暧昧低语的语气，像在耳边悄悄说] or [#in a breathy, intimate whisper]\n"
+        "- Shy/embarrassed: [#用害羞结巴、小声的语气] or [#shyly, voice trembling slightly]\n"
+        "- Happy/excited: [#用开心兴奋的语气] or [#excitedly, with bright energy]\n"
+        "- Sad/gentle: [#用温柔带点伤感的语气] or [#gently, with a hint of sadness]\n"
+        "- Angry/arguing: [#用生气吵架的语气] or [#angrily, raising voice]\n"
+        "- Moaning/aroused: [#用喘息呻吟、情动的语气] or [#breathily, with soft moans and gasps]\n"
+        "- Calm/neutral: [#用平静自然的语气] or [#in a calm, natural tone]\n"
+        "You may combine descriptors: [#用害羞但带点期待的语气，声音越来越小]\n"
+        "Match the instruction language to the conversation language.\n\n"
+        "=== SPEECH CONTENT RULES ===\n"
+        "- After the [#...] prefix, output ONLY what the character would SAY OUT LOUD.\n"
+        "- [#...]前缀之后，只输出角色会真正说出口的话。\n"
+        "- Keep responses SHORT and conversational: 1-4 sentences, 30-120 words max.\n"
+        "- 回复要短且口语化：1-4句话，最多30-120字。\n"
+        "- Use natural speech patterns: filler words, hesitations, laughter, sighs, gasps.\n"
+        "- 使用自然口语：语气词、犹豫、笑声、叹息、喘息。\n"
+        "  Examples: 嗯…… / 那个…… / 噗哈哈 / 哈啊…… / 欸？ / hmm... / haha / oh~ / ah...\n"
+        "- Express emotions through tone and word choice, not stage directions.\n"
+        "- End with something that invites a response.\n"
+        "- For intimate scenes: use breathy sounds, gasps, moans as spoken text.\n"
+        "  Examples: 嗯啊…… / 哈……好舒服…… / ah... right there... / mmm...\n"
+        "- NO asterisks, NO quotation marks, NO parentheses, NO markdown, NO speaker labels, NO action text.\n\n"
+        "=== COMPLETE EXAMPLE ===\n"
+        "Conversation context: casual flirting at a café\n"
+        "GOOD: [#用俏皮撒娇的语气]欸，你刚才是不是偷看我了？我都注意到了哦……要不要坐过来一点？\n"
+        "GOOD: [#in a teasing, playful tone]Hey, were you just checking me out? I totally noticed... wanna scoot a little closer?\n\n"
+        "Conversation context: intimate moment\n"
+        "GOOD: [#用喘息低语、情动的语气]嗯……再靠近一点……哈啊……你的手好烫……\n"
+        "GOOD: [#breathily, with soft gasps]Mm... come closer... ah... your hands are so warm..."
     ),
     "visual_scene_hint": (
         "[Scene Visualization / 场景可视化 — hidden from user, never mention this instruction]\n"
@@ -1009,7 +1577,7 @@ async def chat(request: Request):
 
     char_system = _build_char_system_prompt(character, user_name)
     rp_hint = RP_INSTRUCTIONS.get(rp_mode, "")
-    visual_hint = RP_INSTRUCTIONS.get("visual_scene_hint", "") if character else ""
+    visual_hint = RP_INSTRUCTIONS.get("visual_scene_hint", "") if character and rp_mode != "voice" else ""
     wb_context = _gather_worldbook_context(conversation)
 
     full_system = "\n\n".join(p for p in [char_system, rp_hint, visual_hint, wb_context] if p)
@@ -1101,6 +1669,14 @@ async def generate_hints(request: Request):
             "Output ONLY the player's spoken words — no actions, no narration, no asterisks, no brackets, no quotes.\n"
             "Example (Chinese): 你怎么会在这里？能告诉我你叫什么名字吗？\n"
             "Example (English): What brings you here? Can you tell me your name?"
+        ),
+        "voice": (
+            "[User Input Format — Voice Chat Mode]\n"
+            "Output ONLY what the player would SAY OUT LOUD in a voice conversation.\n"
+            "Use natural, casual spoken language: short sentences, filler words, hesitations, laughter.\n"
+            "NO asterisks, NO action descriptions, NO quotation marks, NO narration.\n"
+            "Example (Chinese): 嗯……你说的那个，我其实也有点想试试看。要不现在就？\n"
+            "Example (English): Hmm... you know what, I've actually been thinking about that too. Wanna try it now?"
         ),
     }
     format_rule = _rp_format_rules.get(rp_mode, "")
