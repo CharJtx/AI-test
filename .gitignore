@@ -10,6 +10,7 @@ venv/
 # Environment
 .env
 
+
 # Runtime data
 data/chats.json
 
@@ -22,6 +23,7 @@ playground/scenes/**/*.avi
 # IDE
 .vscode/
 .idea/
+.cursor/rules/python-environment.mdc
 *.swp
 *.swo
 
