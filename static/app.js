@@ -2322,5 +2322,9 @@ document.getElementById("btn-orgasm-cmd")?.addEventListener("click", function ()
   triggerCharacterLine("/api/command-transition", { command: "orgasm_face" }, this);
 });
 
+document.getElementById("btn-voice-greeting")?.addEventListener("click", function () {
+  triggerCharacterLine("/api/voice-greeting", {}, this);
+});
+
 // ── 启动应用 ────────────────────────────────────────────
 init();

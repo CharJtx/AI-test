@@ -1662,6 +1662,122 @@ async def command_transition(request: Request):
     return {"text": text}
 
 
+@app.post("/api/voice-greeting")
+async def voice_greeting(request: Request):
+    """切换到语音聊天模式时，由角色主动发送的语音开场白。
+
+    - 有聊天记录时：根据上下文生成自然的语音过渡
+    - 无记录但有 first_mes：将 first_mes 转写为纯口语版本
+    - 都没有：基于角色设定即兴生成
+
+    请求体:
+        model (str): 模型 ID
+        conversation (list): 当前对话
+        character (dict|null): 角色卡
+        user_name (str): 用户昵称
+    返回:
+        {"text": "语音开场白"}
+    """
+    body = await request.json()
+    model = body.get("model", "openai/gpt-4o-mini")
+    conversation = body.get("conversation", [])
+    character = body.get("character")
+    user_name = body.get("user_name", "用户")
+
+    char_name = character.get("name", "角色") if character else "角色"
+    char_system = _build_char_system_prompt(character, user_name)
+    has_history = len(conversation) > 0
+
+    if has_history:
+        recent = conversation[-6:] if len(conversation) > 6 else conversation
+        conv_text = "\n".join(
+            f"[{user_name}]: {m['content'][:300]}" if m["role"] == "user"
+            else f"[{char_name}]: {m['content'][:300]}"
+            for m in recent
+        )
+        task_instruction = (
+            f"You are now switching to LIVE VOICE conversation with '{user_name}'.\n"
+            f"Based on the recent chat, generate ONE natural spoken greeting as '{char_name}' "
+            "to smoothly transition into voice chat.\n"
+            "It should feel like the character is now 'speaking live' — acknowledge the "
+            "mood/topic naturally without summarizing or repeating what was already said.\n"
+        )
+        user_msg = f"Recent conversation:\n{conv_text}\n\n(Now switch to voice mode. Generate a spoken greeting.)"
+    else:
+        first_mes = character.get("first_mes", "") if character else ""
+        first_mes = _replace_placeholders(first_mes, char_name, user_name) if first_mes else ""
+        task_instruction = (
+            f"The character '{char_name}' is starting a LIVE VOICE conversation with '{user_name}'.\n"
+        )
+        if first_mes:
+            task_instruction += (
+                "Below is the character's written greeting (may contain *action descriptions* and narration). "
+                "Convert it into a SHORT, natural SPOKEN greeting suitable for voice chat. "
+                "Keep the character's personality, tone and relationship setting. "
+                "Extract only what would be SAID OUT LOUD — drop all narration and action text.\n"
+                f"\nOriginal written greeting:\n{first_mes[:800]}\n"
+            )
+        else:
+            task_instruction += (
+                "No prior conversation exists. Generate a short, natural spoken greeting "
+                "to start the conversation, matching the character's personality.\n"
+            )
+        user_msg = "(Generate the voice greeting now.)"
+
+    system_prompt = (
+        f"{char_system}\n\n"
+        f"[TASK — Voice Greeting]\n{task_instruction}\n"
+        "Rules:\n"
+        "- Stay 100% in-character. Never mention you are an AI or break the fourth wall.\n"
+        "- Keep it SHORT and spoken: 1-3 sentences, ≤60 words.\n"
+        "- Must feel like a natural live opener, not a written paragraph.\n"
+        "- Match the language of the character card and conversation.\n"
+        "\n=== VOICE FORMAT (MANDATORY) ===\n"
+        "Start with a TTS voice instruction prefix: [#instruction]\n"
+        "After the prefix, output ONLY spoken words. No asterisks, no quotes, no action text.\n"
+        "Example: [#用温柔打招呼的语气]嗨～终于能听到你的声音了，今天过得怎么样？\n"
+        "Example: [#in a warm, cheerful tone]Hey~ So nice to finally hear your voice. How's your day going?\n"
+        "\nOutput ONLY the character's spoken greeting. Nothing else."
+    )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_msg},
+    ]
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.85,
+                "max_tokens": 150,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"LLM API error: {resp.status_code}"},
+            status_code=502,
+        )
+
+    text = (
+        resp.json()
+        .get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+    return {"text": text}
+
+
 # ── RP 格式指令（前端动态加载） ────────────────────────────
 
 RP_INSTRUCTIONS = {
