@@ -1387,6 +1387,210 @@ async def tts_speak(request: Request):
     )
 
 
+# ── 主动对话 & 指令过渡 ─────────────────────────────────────
+
+@app.post("/api/idle-prompt")
+async def idle_prompt(request: Request):
+    """用户长时间沉默时，手动触发角色主动开口（不脱离角色）。
+
+    请求体:
+        model (str): 模型 ID
+        conversation (list): 当前对话
+        character (dict|null): 角色卡
+        user_name (str): 用户昵称
+        rp_format_mode (str): 当前 RP 格式
+    返回:
+        {"text": "角色主动说的一句话"}
+    """
+    body = await request.json()
+    model = body.get("model", "openai/gpt-4o-mini")
+    conversation = body.get("conversation", [])
+    character = body.get("character")
+    user_name = body.get("user_name", "用户")
+    rp_mode = body.get("rp_format_mode", "voice")
+
+    char_name = character.get("name", "角色") if character else "角色"
+    char_system = _build_char_system_prompt(character, user_name)
+
+    recent = conversation[-6:] if len(conversation) > 6 else conversation
+    conv_text = "\n".join(
+        f"[{user_name}]: {m['content'][:300]}" if m["role"] == "user"
+        else f"[{char_name}]: {m['content'][:300]}"
+        for m in recent
+    )
+
+    is_voice = rp_mode == "voice"
+
+    idle_system = (
+        f"{char_system}\n\n"
+        "[TASK — Idle / Silence Breaking]\n"
+        f"The player '{user_name}' has been SILENT for a while during your live conversation.\n"
+        f"As '{char_name}', generate ONE short, natural line to break the silence and re‑engage the player.\n\n"
+        "Rules:\n"
+        "- Stay 100% in-character. Never mention you are an AI or break the fourth wall.\n"
+        "- Tone should match the current conversation mood (casual → casual quip; intimate → soft tease).\n"
+        "- Keep it SHORT: 1-2 sentences, ≤50 words.\n"
+        "- Vary the approach: gentle tease, playful poke, curious question, soft sigh, coy remark…\n"
+        "- If the conversation has been intimate, you may use suggestive/flirty language.\n"
+        "- Do NOT repeat what you just said. Do NOT summarize the conversation.\n"
+    )
+
+    if is_voice:
+        idle_system += (
+            "\n=== VOICE FORMAT (MANDATORY) ===\n"
+            "Start with a TTS voice instruction prefix: [#instruction]\n"
+            "After the prefix, output ONLY spoken words. No asterisks, no quotes, no action text.\n"
+            "Example: [#用俏皮的语气]喂～还在吗？怎么突然安静了？\n"
+            "Example: [#in a soft, teasing tone]Hey... you still there? Cat got your tongue?\n"
+        )
+    else:
+        rp_hint = RP_INSTRUCTIONS.get(rp_mode, "")
+        if rp_hint:
+            idle_system += f"\n{rp_hint}\n"
+
+    idle_system += "\nOutput ONLY the character's line. Nothing else."
+
+    messages = [
+        {"role": "system", "content": idle_system},
+        {"role": "user", "content": f"Recent conversation:\n{conv_text}\n\n(The player is now silent. Generate one line.)" if conv_text else "(Conversation just started but the player hasn't said anything yet. Generate a friendly opener.)"},
+    ]
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.85,
+                "max_tokens": 150,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"LLM API error: {resp.status_code}"},
+            status_code=502,
+        )
+
+    text = (
+        resp.json()
+        .get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+    return {"text": text}
+
+
+@app.post("/api/command-transition")
+async def command_transition(request: Request):
+    """用户点击指令按钮后，生成一段角色过渡台词，播放完毕后切到预制视频。
+
+    请求体:
+        model (str): 模型 ID
+        command (str): 指令名称，目前仅 "orgasm_face"
+        conversation (list): 当前对话
+        character (dict|null): 角色卡
+        user_name (str): 用户昵称
+        rp_format_mode (str): 当前 RP 格式
+    返回:
+        {"text": "过渡台词"}
+    """
+    body = await request.json()
+    model = body.get("model", "openai/gpt-4o-mini")
+    command = body.get("command", "orgasm_face")
+    conversation = body.get("conversation", [])
+    character = body.get("character")
+    user_name = body.get("user_name", "用户")
+    rp_mode = body.get("rp_format_mode", "voice")
+
+    char_name = character.get("name", "角色") if character else "角色"
+    char_system = _build_char_system_prompt(character, user_name)
+
+    recent = conversation[-6:] if len(conversation) > 6 else conversation
+    conv_text = "\n".join(
+        f"[{user_name}]: {m['content'][:300]}" if m["role"] == "user"
+        else f"[{char_name}]: {m['content'][:300]}"
+        for m in recent
+    )
+
+    is_voice = rp_mode == "voice"
+
+    transition_system = (
+        f"{char_system}\n\n"
+        "[TASK — Command Transition: Orgasm]\n"
+        f"As '{char_name}', you need to generate a SHORT transition line that naturally leads into an orgasm moment.\n"
+        "This line will be spoken right before a pre-recorded orgasm video plays.\n\n"
+        "Rules:\n"
+        "- Stay 100% in-character. Never mention video, commands, buttons, or break the fourth wall.\n"
+        "- The line should feel like a natural build-up or climax moment, regardless of the prior conversation topic.\n"
+        "- If the conversation was casual/non-intimate, treat it as a sudden overwhelming sensation — the character can act surprised by their own reaction.\n"
+        "- If the conversation was already intimate, let it be a natural escalation.\n"
+        "- Keep it SHORT: 1-2 sentences, ≤40 words.\n"
+        "- Express rising pleasure, breathlessness, losing control.\n"
+        "- Use the character's speech style and personality.\n"
+        "- The line should END at the edge of climax — the video will show the actual orgasm.\n"
+    )
+
+    if is_voice:
+        transition_system += (
+            "\n=== VOICE FORMAT (MANDATORY) ===\n"
+            "Start with a TTS voice instruction prefix: [#instruction]\n"
+            "After the prefix, output ONLY spoken words. No asterisks, no quotes, no action text.\n"
+            "Example: [#用喘息呻吟、快要高潮的语气]啊……不行了……要、要去了……！\n"
+            "Example: [#breathily, voice trembling with pleasure]Ah... I can't... I'm going to... oh god...\n"
+        )
+    else:
+        rp_hint = RP_INSTRUCTIONS.get(rp_mode, "")
+        if rp_hint:
+            transition_system += f"\n{rp_hint}\n"
+
+    transition_system += "\nOutput ONLY the character's transition line. Nothing else."
+
+    messages = [
+        {"role": "system", "content": transition_system},
+        {"role": "user", "content": f"Recent conversation:\n{conv_text}\n\n(Generate the orgasm transition line now.)" if conv_text else "(Generate the orgasm transition line now.)"},
+    ]
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "temperature": 0.9,
+                "max_tokens": 120,
+            },
+            headers={
+                "Authorization": f"Bearer {get_api_key()}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        return JSONResponse(
+            {"error": f"LLM API error: {resp.status_code}"},
+            status_code=502,
+        )
+
+    text = (
+        resp.json()
+        .get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+
+    return {"text": text}
+
+
 # ── RP 格式指令（前端动态加载） ────────────────────────────
 
 RP_INSTRUCTIONS = {

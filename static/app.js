@@ -2191,5 +2191,84 @@ function openCharEditor(existingChar) {
   });
 })();
 
+// ── 破冰 & 高潮过渡指令 ──────────────────────────────────
+
+/**
+ * 通用函数：调用后端生成角色台词 → 插入聊天 → TTS 播放。
+ * @param {string} endpoint  后端路径，如 "/api/idle-prompt"
+ * @param {object} extra     额外请求体字段 (如 {command: "orgasm_face"})
+ * @param {HTMLButtonElement} btn 触发按钮
+ */
+async function triggerCharacterLine(endpoint, extra, btn) {
+  if (state.selectedModels.length === 0) {
+    alert("请先选择一个模型。");
+    return;
+  }
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳";
+
+  const modelId = state.selectedModels[0];
+  const conversation = (state.conversations[modelId] || [])
+    .filter((m) => !m._streaming)
+    .map((m) => ({ role: m.role, content: m.content }));
+  const activeChar = getActiveChar();
+  const rpMode = document.getElementById("rp-format-mode")?.value || "voice";
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelId,
+        conversation,
+        character: activeChar,
+        user_name: state.userName,
+        rp_format_mode: rpMode,
+        ...extra,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    const text = data.text;
+    if (!text) throw new Error("后端返回了空文本");
+
+    if (!state.conversations[modelId]) state.conversations[modelId] = [];
+    state.conversations[modelId].push({ role: "assistant", content: text });
+    renderChatColumns();
+
+    const isVoice = rpMode === "voice";
+    let userCtx = "";
+    if (isVoice) {
+      const conv = state.conversations[modelId];
+      for (let j = conv.length - 2; j >= 0; j--) {
+        if (conv[j]?.role === "user") { userCtx = conv[j].content; break; }
+      }
+    }
+
+    const msgContainer = document.getElementById(`msgs-${CSS.escape(modelId)}`);
+    const lastMsg = msgContainer?.querySelector(".message:last-child .tts-btn");
+    if (lastMsg) {
+      speakText(text, lastMsg, { voiceMode: isVoice, userContext: userCtx });
+    }
+  } catch (e) {
+    alert("生成失败: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+document.getElementById("btn-idle-prompt")?.addEventListener("click", function () {
+  triggerCharacterLine("/api/idle-prompt", {}, this);
+});
+
+document.getElementById("btn-orgasm-cmd")?.addEventListener("click", function () {
+  triggerCharacterLine("/api/command-transition", { command: "orgasm_face" }, this);
+});
+
 // ── 启动应用 ────────────────────────────────────────────
 init();
