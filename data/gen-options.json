@@ -1,0 +1,66 @@
+[
+  {
+    "key": "personality",
+    "label": "Personality",
+    "label_zh": "性格类型",
+    "simple": true,
+    "options": [
+      {
+        "display": "Nympho（高性欲渴求系）",
+        "value": "Nympho"
+      },
+      {
+        "display": "Submissive（抖M系）",
+        "value": "Submissive"
+      },
+      {
+        "display": "Dominant（女王支配系）",
+        "value": "Dominant"
+      },
+      {
+        "display": "Innocent（纯真绿茶系）",
+        "value": "Innocent"
+      },
+      {
+        "display": "Caregiver（治愈温柔系）",
+        "value": "Caregiver"
+      },
+      {
+        "display": "Confidant（自信迷人系）",
+        "value": "Confidant"
+      },
+      {
+        "display": "Energetic（阳光活力系）",
+        "value": "Energetic"
+      },
+      {
+        "display": "Detached（冷淡高冷系）",
+        "value": "Detached"
+      },
+      {
+        "display": "Tease（魅惑撩人系）",
+        "value": "Tease"
+      }
+    ]
+  },
+  {
+    "key": "relationship",
+    "label": "Relationship",
+    "label_zh": "我与 ta 的关系",
+    "simple": false,
+    "options": [
+      {
+        "display": "StepMom",
+        "value": "StepMom"
+      },
+      {
+        "display": "Wife",
+        "value": "Wife"
+      },
+      {
+        "display": "Detached",
+        "value": "StepMom"
+      }
+    ]
+  }
+]

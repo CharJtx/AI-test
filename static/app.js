@@ -1711,6 +1711,14 @@ function openCharGenerator() {
         </div>
       </div>
 
+      <div style="margin-top:8px;display:flex;align-items:center;gap:6px">
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--text-muted)">
+          <input type="checkbox" id="gen-simple-mode"> 简易创建（仅显示关键选项）
+        </label>
+        <a href="/gen-options.html" target="_blank" style="font-size:11px;color:var(--text-muted);margin-left:auto;text-decoration:none">管理选项 →</a>
+      </div>
+      <div id="gen-options-area" style="margin-top:6px"></div>
+
       <div class="char-field" style="margin-top:8px">
         <label>生成模型</label>
         <select id="gen-model">
@@ -1735,6 +1743,48 @@ function openCharGenerator() {
 
   let currentTab = "text";
   let selectedFile = null;
+
+  // 加载下拉选项
+  let _allGenOpts = [];
+
+  function renderGenOptions() {
+    const area = document.getElementById("gen-options-area");
+    const simple = document.getElementById("gen-simple-mode")?.checked;
+    const visible = simple ? _allGenOpts.filter(g => g.simple) : _allGenOpts;
+    if (visible.length === 0) {
+      area.innerHTML = simple ? '<div style="font-size:11px;color:var(--text-muted);padding:4px 0">当前无简易模式选项。<a href="/gen-options.html" target="_blank">去管理页面设置</a></div>' : '';
+      return;
+    }
+    area.innerHTML = visible.map(g =>
+      `<div class="char-field" style="margin-bottom:6px">` +
+      `<label>${escapeHtml(g.label_zh || g.label)}</label>` +
+      `<select class="gen-opt-select" data-key="${escapeHtml(g.key)}" style="width:100%;padding:4px 8px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">` +
+      `<option value="">-- 不指定 --</option>` +
+      g.options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.display)}</option>`).join("") +
+      `</select></div>`
+    ).join("");
+  }
+
+  (async () => {
+    try {
+      const resp = await fetch("/api/gen-options");
+      _allGenOpts = await resp.json();
+      if (!Array.isArray(_allGenOpts)) _allGenOpts = [];
+      renderGenOptions();
+    } catch (e) {
+      console.warn("Failed to load gen-options:", e);
+    }
+  })();
+
+  document.getElementById("gen-simple-mode")?.addEventListener("change", renderGenOptions);
+
+  function collectGenSelections() {
+    const sels = {};
+    document.querySelectorAll(".gen-opt-select").forEach(sel => {
+      if (sel.value) sels[sel.dataset.key] = sel.value;
+    });
+    return sels;
+  }
 
   // 标签页切换逻辑
   overlay.querySelectorAll(".gen-tab").forEach(btn => {
@@ -1795,16 +1845,18 @@ function openCharGenerator() {
   document.getElementById("gen-cancel").addEventListener("click", () => overlay.remove());
 
   $submit.addEventListener("click", async () => {
+    const selections = collectGenSelections();
     if (currentTab === "text") {
       const keywords = document.getElementById("gen-keywords").value.trim();
       if (!keywords) { alert("请输入关键词"); return; }
-      await doGenerate({ keywords, model: $model.value });
+      await doGenerate({ keywords, model: $model.value, gen_selections: selections });
     } else {
       if (!selectedFile) { alert("请上传一张图片"); return; }
       const form = new FormData();
       form.append("image", selectedFile);
       form.append("extra", document.getElementById("gen-extra").value);
       form.append("model", $model.value);
+      form.append("gen_selections", JSON.stringify(selections));
       await doGenerate(form);
     }
   });

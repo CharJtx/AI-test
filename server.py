@@ -62,6 +62,7 @@ WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
 CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
 CHATS_FILE = DATA_DIR / "chats.json"            # 聊天记录
 KOL_CHARS_FILE = DATA_DIR / "kol-characters.json" # KOL outfit 角色卡
+GEN_OPTIONS_FILE = DATA_DIR / "gen-options.json"  # 角色生成下拉选项
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"  # OpenRouter API 基础地址
 
 
@@ -272,6 +273,62 @@ Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 }"""
 
 
+def _load_gen_options() -> list[dict]:
+    return _load_json(GEN_OPTIONS_FILE)
+
+
+def _save_gen_options(data: list[dict]):
+    _save_json(GEN_OPTIONS_FILE, data)
+
+
+@app.get("/api/gen-options")
+async def get_gen_options():
+    """返回角色生成下拉选项配置。"""
+    return JSONResponse(_load_gen_options(), headers={"Cache-Control": "no-store"})
+
+
+@app.put("/api/gen-options")
+async def save_gen_options(request: Request):
+    """整体覆盖保存所有选项组。"""
+    data = await request.json()
+    if not isinstance(data, list):
+        return JSONResponse({"error": "body must be a JSON array"}, status_code=400)
+    _save_gen_options(data)
+    return JSONResponse({"ok": True, "count": len(data)})
+
+
+@app.put("/api/gen-options/{key}")
+async def update_gen_option_group(key: str, request: Request):
+    """更新单个选项组。"""
+    body = await request.json()
+    groups = _load_gen_options()
+    for i, g in enumerate(groups):
+        if g["key"] == key:
+            groups[i] = {**g, **body, "key": key}
+            _save_gen_options(groups)
+            return JSONResponse({"ok": True, "group": groups[i]})
+    return JSONResponse({"error": "group not found"}, status_code=404)
+
+
+@app.delete("/api/gen-options/{key}")
+async def delete_gen_option_group(key: str):
+    """删除一个选项组。"""
+    groups = _load_gen_options()
+    new_groups = [g for g in groups if g["key"] != key]
+    if len(new_groups) == len(groups):
+        return JSONResponse({"error": "group not found"}, status_code=404)
+    _save_gen_options(new_groups)
+    return JSONResponse({"ok": True})
+
+
+def _build_gen_supplement(selections: dict) -> str:
+    """将前端传来的下拉选择 {key: value} 拼装为补充设定文本。"""
+    if not selections:
+        return ""
+    parts = [f"{k}: {v}" for k, v in selections.items() if v]
+    return "\n".join(parts)
+
+
 @app.post("/api/characters/generate")
 async def generate_character(request: Request):
     """
@@ -280,6 +337,7 @@ async def generate_character(request: Request):
     请求体参数:
         keywords (str): 角色概念/关键词描述
         model (str): 使用的 LLM 模型 ID
+        gen_selections (dict): 下拉菜单选项，如 {"Personality": "Nympho"}
     返回: {"character": {角色卡完整数据}}
 
     流程：关键词 → LLM 生成 JSON 角色卡 → 自动生成头像提示词 → 保存到本地
@@ -287,6 +345,7 @@ async def generate_character(request: Request):
     body = await request.json()
     keywords = body.get("keywords", "")
     model = body.get("model", "x-ai/grok-4-0205")
+    supplement = _build_gen_supplement(body.get("gen_selections", {}))
 
     if not keywords.strip():
         return JSONResponse({"error": "keywords is required"}, status_code=400)
@@ -298,7 +357,10 @@ async def generate_character(request: Request):
                 "model": model,
                 "messages": [
                     {"role": "system", "content": CHAR_GEN_SYSTEM},
-                    {"role": "user", "content": f"Generate a character card based on these keywords/concepts:\n\n{keywords}"},
+                    {"role": "user", "content": (
+                        f"Generate a character card based on these keywords/concepts:\n\n{keywords}"
+                        + (f"\n\n[Supplementary Settings]\n{supplement}" if supplement else "")
+                    )},
                 ],
                 "temperature": 0.9,
                 "max_tokens": 16000,
@@ -425,6 +487,7 @@ async def generate_character_from_image(
     image: UploadFile = File(...),
     extra: str = Form(""),
     model: str = Form("google/gemini-2.5-flash-preview"),
+    gen_selections: str = Form("{}"),
 ):
     """
     通过上传角色图片，由多模态 LLM 推理生成对应的角色卡。
@@ -447,9 +510,17 @@ async def generate_character_from_image(
     user_content = [
         {"type": "image_url", "image_url": {"url": data_url}},
     ]
+    try:
+        sel = json.loads(gen_selections) if gen_selections else {}
+    except json.JSONDecodeError:
+        sel = {}
+    supplement = _build_gen_supplement(sel)
+
     text_part = "Generate a complete character card based on this image."
     if extra.strip():
         text_part += f"\n\nAdditional notes from the user:\n{extra.strip()}"
+    if supplement:
+        text_part += f"\n\n[Supplementary Settings]\n{supplement}"
     user_content.append({"type": "text", "text": text_part})
 
     async with httpx.AsyncClient(timeout=180) as client:

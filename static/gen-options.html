@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>角色生成选项管理</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#1c2129;--border:#30363d;--text:#e6edf3;--text-muted:#8b949e;--accent:#58a6ff;--accent-hover:#79b8ff;--danger:#f85149;--success:#3fb950;--warning:#d29922;--radius:8px}
+    html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface)}
+    header h1{font-size:18px;font-weight:600}
+    header a{color:var(--text-muted);text-decoration:none;font-size:13px}
+    header a:hover{color:var(--accent)}
+
+    .toolbar{display:flex;gap:10px;align-items:center;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .toolbar button{padding:6px 16px;font-size:13px;font-weight:500;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;transition:background .15s}
+    .toolbar button:hover{background:var(--accent-hover)}
+    .toolbar .secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+    .toolbar .secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .toolbar .spacer{flex:1}
+    .toolbar .info{font-size:12px;color:var(--text-muted)}
+
+    .container{padding:20px 24px;max-width:960px;margin:0 auto}
+
+    .group-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
+    .group-card.simple-on{border-left:3px solid var(--success)}
+
+    .group-header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border)}
+    .group-header .key{font-family:monospace;font-size:13px;color:var(--accent);min-width:100px}
+    .group-header .label{font-weight:600;flex:1}
+    .group-header .label-zh{color:var(--text-muted);font-size:12px;margin-left:8px}
+    .group-header .actions{display:flex;gap:6px;align-items:center}
+
+    .simple-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500}
+    .simple-badge.on{background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)}
+    .simple-badge.off{background:rgba(139,148,158,.1);color:var(--text-muted);border:1px solid var(--border)}
+
+    .group-body{padding:12px 16px}
+
+    .opt-table{width:100%;border-collapse:collapse}
+    .opt-table th{text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:4px 8px;border-bottom:1px solid var(--border)}
+    .opt-table td{padding:6px 8px;border-bottom:1px solid rgba(48,54,61,.5);font-size:13px;vertical-align:middle}
+    .opt-table tr:last-child td{border-bottom:none}
+    .opt-table .col-display{width:55%}
+    .opt-table .col-value{width:30%}
+    .opt-table .col-actions{width:15%;text-align:right}
+
+    .opt-input{width:100%;padding:4px 8px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);outline:none}
+    .opt-input:focus{border-color:var(--accent)}
+
+    .icon-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:4px;color:var(--text-muted);transition:all .15s}
+    .icon-btn:hover{color:var(--text);background:var(--surface2)}
+    .icon-btn.danger:hover{color:var(--danger)}
+
+    .btn-sm{padding:4px 10px;font-size:11px;font-weight:500;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--text);cursor:pointer;transition:all .15s}
+    .btn-sm:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-sm.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-sm.primary:hover{background:var(--accent-hover)}
+    .btn-sm.danger{color:var(--danger);border-color:rgba(248,81,73,.3)}
+    .btn-sm.danger:hover{background:rgba(248,81,73,.1);border-color:var(--danger)}
+
+    .add-opt-row{display:flex;gap:6px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+    .add-opt-row input{flex:1}
+
+    .empty-msg{text-align:center;padding:40px;color:var(--text-muted);font-size:14px}
+
+    .dialog-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
+    .dialog{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;width:420px;max-width:90vw}
+    .dialog h3{margin-bottom:12px;font-size:16px}
+    .dialog .field{margin-bottom:10px}
+    .dialog .field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px}
+    .dialog .field input,.dialog .field select{width:100%;padding:6px 10px;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);outline:none}
+    .dialog .field input:focus{border-color:var(--accent)}
+    .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+    .toggle{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle .slider{position:absolute;inset:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;transition:all .2s}
+    .toggle .slider::before{content:"";position:absolute;height:14px;width:14px;left:2px;bottom:2px;background:var(--text-muted);border-radius:50%;transition:all .2s}
+    .toggle input:checked+.slider{background:var(--accent);border-color:var(--accent)}
+    .toggle input:checked+.slider::before{transform:translateX(16px);background:#fff}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🏷️ 角色生成选项管理</h1>
+    <a href="/">← 返回主页</a>
+  </header>
+
+  <div class="toolbar">
+    <button id="btn-add-group">+ 新建选项组</button>
+    <span class="spacer"></span>
+    <span class="info" id="toolbar-info"></span>
+  </div>
+
+  <div class="container" id="content">
+    <div class="empty-msg">加载中…</div>
+  </div>
+
+<script>
+const $content = document.getElementById("content");
+const $info = document.getElementById("toolbar-info");
+let groups = [];
+
+async function load() {
+  try {
+    const resp = await fetch("/api/gen-options");
+    groups = await resp.json();
+    render();
+  } catch (e) {
+    $content.innerHTML = `<div class="empty-msg" style="color:var(--danger)">加载失败: ${esc(e.message)}</div>`;
+  }
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+
+function render() {
+  $info.textContent = `共 ${groups.length} 个选项组`;
+  if (groups.length === 0) {
+    $content.innerHTML = '<div class="empty-msg">暂无选项组，点击「+ 新建选项组」开始</div>';
+    return;
+  }
+  $content.innerHTML = groups.map((g, gi) => `
+    <div class="group-card ${g.simple ? 'simple-on' : ''}" data-idx="${gi}">
+      <div class="group-header">
+        <span class="key">${esc(g.key)}</span>
+        <span class="label">${esc(g.label)}<span class="label-zh">${esc(g.label_zh || '')}</span></span>
+        <span class="simple-badge ${g.simple ? 'on' : 'off'}">${g.simple ? '✓ 简易模式' : '— 仅完整模式'}</span>
+        <div class="actions">
+          <button class="btn-sm" onclick="toggleSimple(${gi})" title="切换简易模式">${g.simple ? '关闭简易' : '启用简易'}</button>
+          <button class="btn-sm" onclick="editGroup(${gi})">编辑</button>
+          <button class="btn-sm danger" onclick="deleteGroup(${gi})">删除</button>
+        </div>
+      </div>
+      <div class="group-body">
+        <table class="opt-table">
+          <thead><tr><th class="col-display">显示文本</th><th class="col-value">传入值</th><th class="col-actions"></th></tr></thead>
+          <tbody>
+            ${g.options.map((o, oi) => `
+              <tr>
+                <td>${esc(o.display)}</td>
+                <td><code style="color:var(--accent)">${esc(o.value)}</code></td>
+                <td style="text-align:right">
+                  <button class="icon-btn" onclick="editOpt(${gi},${oi})" title="编辑">✏️</button>
+                  <button class="icon-btn danger" onclick="deleteOpt(${gi},${oi})" title="删除">🗑️</button>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        <div class="add-opt-row">
+          <input class="opt-input" id="new-display-${gi}" placeholder="显示文本，如 Bold（大胆系）">
+          <input class="opt-input" id="new-value-${gi}" placeholder="传入值，如 Bold" style="max-width:150px">
+          <button class="btn-sm primary" onclick="addOpt(${gi})">+ 添加</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function save() {
+  try {
+    const resp = await fetch("/api/gen-options", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(groups),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  } catch (e) {
+    alert("保存失败: " + e.message);
+  }
+}
+
+async function toggleSimple(gi) {
+  groups[gi].simple = !groups[gi].simple;
+  await save();
+  render();
+}
+
+async function deleteGroup(gi) {
+  if (!confirm(`确定删除「${groups[gi].label}」选项组？`)) return;
+  groups.splice(gi, 1);
+  await save();
+  render();
+}
+
+async function deleteOpt(gi, oi) {
+  if (!confirm(`确定删除选项「${groups[gi].options[oi].display}」？`)) return;
+  groups[gi].options.splice(oi, 1);
+  await save();
+  render();
+}
+
+async function addOpt(gi) {
+  const display = document.getElementById(`new-display-${gi}`).value.trim();
+  const value = document.getElementById(`new-value-${gi}`).value.trim();
+  if (!display || !value) { alert("显示文本和传入值都不能为空"); return; }
+  groups[gi].options.push({ display, value });
+  await save();
+  render();
+}
+
+function editOpt(gi, oi) {
+  const o = groups[gi].options[oi];
+  showDialog("编辑选项", [
+    { key: "display", label: "显示文本", value: o.display },
+    { key: "value", label: "传入值", value: o.value },
+  ], async (vals) => {
+    if (!vals.display || !vals.value) { alert("不能为空"); return false; }
+    groups[gi].options[oi] = { display: vals.display, value: vals.value };
+    await save();
+    render();
+    return true;
+  });
+}
+
+function editGroup(gi) {
+  const g = groups[gi];
+  showDialog("编辑选项组", [
+    { key: "key", label: "Key（英文标识）", value: g.key },
+    { key: "label", label: "Label（英文名）", value: g.label },
+    { key: "label_zh", label: "中文标签", value: g.label_zh || "" },
+  ], async (vals) => {
+    if (!vals.key || !vals.label) { alert("Key 和 Label 不能为空"); return false; }
+    groups[gi] = { ...g, key: vals.key, label: vals.label, label_zh: vals.label_zh };
+    await save();
+    render();
+    return true;
+  });
+}
+
+document.getElementById("btn-add-group").addEventListener("click", () => {
+  showDialog("新建选项组", [
+    { key: "key", label: "Key（英文标识，如 body_type）", value: "" },
+    { key: "label", label: "Label（英文名，如 Body Type）", value: "" },
+    { key: "label_zh", label: "中文标签（如 体型）", value: "" },
+  ], async (vals) => {
+    if (!vals.key || !vals.label) { alert("Key 和 Label 不能为空"); return false; }
+    if (groups.some(g => g.key === vals.key)) { alert("Key 已存在"); return false; }
+    groups.push({ key: vals.key, label: vals.label, label_zh: vals.label_zh, simple: false, options: [] });
+    await save();
+    render();
+    return true;
+  });
+});
+
+function showDialog(title, fields, onSubmit) {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog">
+      <h3>${esc(title)}</h3>
+      ${fields.map(f => `
+        <div class="field">
+          <label>${esc(f.label)}</label>
+          <input id="dlg-${f.key}" value="${esc(f.value)}">
+        </div>
+      `).join("")}
+      <div class="dialog-actions">
+        <button class="btn-sm" id="dlg-cancel">取消</button>
+        <button class="btn-sm primary" id="dlg-ok">确定</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById("dlg-cancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("dlg-ok").addEventListener("click", async () => {
+    const vals = {};
+    fields.forEach(f => { vals[f.key] = document.getElementById(`dlg-${f.key}`).value.trim(); });
+    const ok = await onSubmit(vals);
+    if (ok !== false) overlay.remove();
+  });
+}
+
+load();
+</script>
+</body>
+</html>
