@@ -1195,19 +1195,25 @@ def _sanitize_for_tts(text: str) -> str:
     return text.strip()
 
 
+def _strip_action_blocks(text: str) -> str:
+    """Remove *action/narration* blocks entirely (voice mode only)."""
+    return re.sub(r'\*[^*]+\*', '', text)
+
+
 def _build_tts_text(
     raw_text: str,
     voice_mode: bool = False,
 ) -> str:
     """Build the final text to send to TTS engine.
 
-    For voice mode: extract [#instruction] prefix and return clean speech body.
-    For non-voice mode: simply clean the text of RP markers.
+    For voice mode: extract [#instruction] prefix, DELETE action blocks, return clean speech.
+    For non-voice mode: simply clean the text of RP markers (keep action text).
     """
     if not voice_mode:
         return _sanitize_for_tts(raw_text)
 
     _instruction, body = _extract_voice_instruction(raw_text)
+    body = _strip_action_blocks(body)
     body = _sanitize_for_tts(body)
     return body
 
