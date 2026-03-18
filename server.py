@@ -14,11 +14,13 @@ AI 角色扮演系统后端服务器
 """
 
 # ── 标准库导入 ──────────────────────────────────────────────
+import asyncio
 import io
 import json
 import logging
 import os
 import re
+import struct
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +28,7 @@ from pathlib import Path
 import base64
 import httpx
 import uuid
+import websockets
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -860,14 +863,13 @@ async def generate_image_prompt(request: Request):
 
 # ── TTS 语音合成（火山引擎 / BytePlus）─────────────────────
 
-VOLC_TTS_URL = os.getenv(
-    "VOLC_TTS_URL",
-    "https://voice.ap-southeast-1.bytepluses.com/api/v3/tts/unidirectional",
+VOLC_TTS_WS_URL = os.getenv(
+    "VOLC_TTS_WS_URL",
+    "wss://voice.ap-southeast-1.bytepluses.com/api/v3/tts/bidirection",
 )
-VOLC_TTS_APP_ID = os.getenv("VOLC_TTS_APP_ID", "")
+VOLC_TTS_APP_KEY = os.getenv("VOLC_TTS_APP_KEY", "aGjiRDfUWi")
 VOLC_TTS_ACCESS_KEY = os.getenv("VOLC_TTS_ACCESS_KEY", "")
 VOLC_TTS_API_KEY = os.getenv("VOLC_TTS_API_KEY", "")
-VOLC_TTS_APP_KEY = "aGjiRDfUWi"
 
 _R10 = "volc.service_type.1000009"  # TTS 1.0
 _R20 = "seed-tts-2.0"              # TTS 2.0 (supports context_texts)
@@ -984,6 +986,222 @@ VOLC_TTS_VOICES = [
 _volc_voice_map: dict[str, dict] = {v["id"]: v for v in VOLC_TTS_VOICES}
 
 
+# ── BytePlus Bidirection TTS 二进制协议常量 ──────────────────
+
+_EVT_START_CONNECTION  = 1
+_EVT_FINISH_CONNECTION = 2
+_EVT_CONNECTION_STARTED = 50
+_EVT_CONNECTION_FAILED  = 51
+_EVT_START_SESSION   = 100
+_EVT_FINISH_SESSION  = 102
+_EVT_SESSION_STARTED  = 150
+_EVT_SESSION_FINISHED = 152
+_EVT_SESSION_FAILED   = 153
+_EVT_TASK_REQUEST     = 200
+_EVT_TTS_SENTENCE_START = 350
+_EVT_TTS_SENTENCE_END   = 351
+_EVT_TTS_RESPONSE       = 352
+
+_MSG_FULL_CLIENT   = 0x1
+_MSG_FULL_SERVER   = 0x9
+_MSG_AUDIO_ONLY    = 0xB
+_MSG_ERROR         = 0xF
+_FLAG_WITH_EVENT   = 0x4
+_SER_RAW  = 0x0
+_SER_JSON = 0x1
+
+
+def _tts_build_header(msg_type: int, flag: int, ser: int, comp: int = 0) -> bytes:
+    return struct.pack("BBBB", 0x11, (msg_type << 4) | flag, (ser << 4) | comp, 0x00)
+
+
+def _tts_build_connection_frame(event: int, payload: bytes = b"{}") -> bytes:
+    """构建 connection 级别的上行帧（StartConnection / FinishConnection）。"""
+    hdr = _tts_build_header(_MSG_FULL_CLIENT, _FLAG_WITH_EVENT, _SER_JSON)
+    return hdr + struct.pack(">i", event) + struct.pack(">I", len(payload)) + payload
+
+
+def _tts_build_session_frame(event: int, session_id: str, payload: bytes = b"{}") -> bytes:
+    """构建 session / data 级别的上行帧（StartSession / FinishSession / TaskRequest 文本）。"""
+    hdr = _tts_build_header(_MSG_FULL_CLIENT, _FLAG_WITH_EVENT, _SER_JSON)
+    sid = session_id.encode("utf-8")
+    return (
+        hdr
+        + struct.pack(">i", event)
+        + struct.pack(">I", len(sid)) + sid
+        + struct.pack(">I", len(payload)) + payload
+    )
+
+
+def _tts_parse_frame(data: bytes) -> dict:
+    """解析一个下行二进制帧，返回结构化字典。"""
+    if len(data) < 4:
+        return {"type": "unknown", "raw": data}
+
+    msg_type = (data[1] >> 4) & 0xF
+    flag = data[1] & 0xF
+    ser = (data[2] >> 4) & 0xF
+    comp = data[2] & 0xF
+    has_event = bool(flag & _FLAG_WITH_EVENT)
+    pos = 4
+
+    if msg_type == _MSG_ERROR:
+        err_code = struct.unpack(">i", data[4:8])[0] if len(data) >= 8 else 0
+        err_payload = data[8:]
+        err_msg = ""
+        if err_payload:
+            try:
+                err_msg = json.loads(err_payload).get("message", err_payload.decode("utf-8", errors="replace"))
+            except Exception:
+                err_msg = err_payload.decode("utf-8", errors="replace")
+        return {"type": "error", "error_code": err_code, "message": err_msg}
+
+    event = None
+    if has_event and len(data) >= pos + 4:
+        event = struct.unpack(">i", data[pos:pos + 4])[0]
+        pos += 4
+
+    # connection 级别响应带 connection_id
+    conn_id = None
+    if event in (_EVT_CONNECTION_STARTED, _EVT_CONNECTION_FAILED):
+        if len(data) >= pos + 4:
+            cid_len = struct.unpack(">I", data[pos:pos + 4])[0]
+            pos += 4
+            if cid_len > 0 and len(data) >= pos + cid_len:
+                conn_id = data[pos:pos + cid_len].decode("utf-8", errors="replace")
+                pos += cid_len
+
+    # session / data 级别响应带 session_id
+    sid = None
+    if event is not None and event not in (_EVT_CONNECTION_STARTED, _EVT_CONNECTION_FAILED):
+        if len(data) >= pos + 4:
+            sid_len = struct.unpack(">I", data[pos:pos + 4])[0]
+            pos += 4
+            if sid_len > 0 and len(data) >= pos + sid_len:
+                sid = data[pos:pos + sid_len].decode("utf-8", errors="replace")
+                pos += sid_len
+
+    payload = b""
+    if len(data) >= pos + 4:
+        p_len = struct.unpack(">I", data[pos:pos + 4])[0]
+        pos += 4
+        if len(data) >= pos + p_len:
+            payload = data[pos:pos + p_len]
+
+    result: dict = {
+        "type": "frame",
+        "msg_type": msg_type,
+        "event": event,
+        "session_id": sid,
+        "connection_id": conn_id,
+        "payload": payload,
+    }
+
+    if ser == _SER_JSON and payload:
+        try:
+            import gzip as _gzip
+            raw = _gzip.decompress(payload) if comp == 1 else payload
+            result["json"] = json.loads(raw)
+        except Exception:
+            pass
+    return result
+
+
+async def _tts_request_via_websocket(
+    session_config: dict,
+    text: str,
+    resource_id: str,
+    timeout: float = 60.0,
+) -> bytes:
+    """通过 WebSocket 调用 BytePlus Bidirection TTS（二进制协议），返回完整音频字节。
+
+    参数:
+        session_config: StartSession 的 JSON payload（包含 speaker、audio_params 等，不含 text）
+        text: 要合成的文本（通过 TaskRequest 发送）
+        resource_id: X-Api-Resource-Id
+        timeout: 接收超时
+    """
+    connect_id = str(uuid.uuid4())
+    session_id = str(uuid.uuid4())
+
+    headers: dict[str, str] = {
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-Connect-Id": connect_id,
+    }
+    if VOLC_TTS_API_KEY:
+        headers["X-Api-Key"] = VOLC_TTS_API_KEY
+    else:
+        headers["X-Api-App-Key"] = VOLC_TTS_APP_KEY
+        headers["X-Api-Access-Key"] = VOLC_TTS_ACCESS_KEY
+
+    audio_data = bytearray()
+
+    try:
+        async with websockets.connect(
+            VOLC_TTS_WS_URL,
+            additional_headers=headers,
+            close_timeout=5,
+            open_timeout=15,
+        ) as ws:
+            # ── 1. StartConnection ──
+            await ws.send(_tts_build_connection_frame(_EVT_START_CONNECTION))
+            resp = await asyncio.wait_for(ws.recv(), timeout=10)
+            f = _tts_parse_frame(resp)
+            if f.get("event") == _EVT_CONNECTION_FAILED or f.get("type") == "error":
+                raise RuntimeError(f"TTS connection failed: {f.get('message') or f.get('json', {}).get('message', 'unknown')}")
+
+            # ── 2. StartSession（带完整配置） ──
+            cfg = {**session_config, "event": _EVT_START_SESSION, "namespace": "BidirectionalTTS"}
+            await ws.send(_tts_build_session_frame(
+                _EVT_START_SESSION, session_id,
+                json.dumps(cfg, ensure_ascii=False).encode("utf-8"),
+            ))
+            resp = await asyncio.wait_for(ws.recv(), timeout=10)
+            f = _tts_parse_frame(resp)
+            if f.get("event") in (_EVT_SESSION_FAILED,):
+                raise RuntimeError(f"TTS session failed: {f.get('json', {}).get('message', 'unknown')}")
+
+            # ── 3. TaskRequest（发送合成文本） ──
+            task_payload = {"event": _EVT_TASK_REQUEST, "req_params": {"text": text}}
+            await ws.send(_tts_build_session_frame(
+                _EVT_TASK_REQUEST, session_id,
+                json.dumps(task_payload, ensure_ascii=False).encode("utf-8"),
+            ))
+
+            # ── 4. FinishSession（告知服务端文本已发送完毕） ──
+            await ws.send(_tts_build_session_frame(_EVT_FINISH_SESSION, session_id))
+
+            # ── 5. 接收音频直到 SessionFinished / SessionFailed ──
+            while True:
+                resp = await asyncio.wait_for(ws.recv(), timeout=timeout)
+                f = _tts_parse_frame(resp)
+
+                if f.get("type") == "error":
+                    raise RuntimeError(f"TTS error {f.get('error_code')}: {f.get('message', '')}")
+
+                evt = f.get("event")
+                if evt == _EVT_TTS_RESPONSE:
+                    audio_data.extend(f["payload"])
+                elif evt == _EVT_SESSION_FINISHED:
+                    break
+                elif evt == _EVT_SESSION_FAILED:
+                    raise RuntimeError(f"TTS session failed: {f.get('json', {}).get('message', 'unknown')}")
+
+            # ── 6. FinishConnection ──
+            await ws.send(_tts_build_connection_frame(_EVT_FINISH_CONNECTION))
+
+    except websockets.exceptions.InvalidStatusCode as e:
+        raise RuntimeError(f"TTS WebSocket connection failed: HTTP {e.status_code}") from e
+    except asyncio.TimeoutError:
+        raise
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"TTS WebSocket error: {e}") from e
+
+    return bytes(audio_data)
+
+
 @app.get("/api/tts/voices")
 async def list_tts_voices():
     """返回所有可用的火山引擎 TTS 音色列表。"""
@@ -1017,7 +1235,7 @@ async def tts_speak_with_emotion(request: Request):
 
     if not text.strip():
         return JSONResponse({"error": "text is required"}, status_code=400)
-    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_ID or not VOLC_TTS_ACCESS_KEY):
+    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_KEY or not VOLC_TTS_ACCESS_KEY):
         return JSONResponse({"error": "TTS credentials not configured"}, status_code=500)
 
     voice_info = _volc_voice_map.get(voice_id)
@@ -1028,69 +1246,31 @@ async def tts_speak_with_emotion(request: Request):
         "enable_language_detector": True,
     }
 
-    audio_params: dict = {"format": "mp3", "sample_rate": 24000}
+    audio_params: dict = {"format": "mp3", "sample_rate": 24000, "bit_rate": 128000}
     if emotion_tag:
         audio_params["emotion"] = emotion_tag
 
-    headers: dict[str, str] = {
-        "X-Api-Resource-Id": resource_id,
-        "X-Api-App-Key": VOLC_TTS_APP_KEY,
-        "Content-Type": "application/json",
-        "Connection": "keep-alive",
-    }
-    if VOLC_TTS_API_KEY:
-        headers["X-Api-Key"] = VOLC_TTS_API_KEY
-    else:
-        headers["X-Api-App-Id"] = VOLC_TTS_APP_ID
-        headers["X-Api-Access-Key"] = VOLC_TTS_ACCESS_KEY
-
-    payload = {
+    session_config = {
         "user": {"uid": "playground_user"},
         "req_params": {
-            "text": _sanitize_for_tts(text),
             "speaker": voice_id,
             "additions": json.dumps(additions),
             "audio_params": audio_params,
         },
     }
+    final_text = _sanitize_for_tts(text)
 
-    logger.info("═══ TTS EMOTION TEST ═══  speaker=%s  emotion=%s  text=%s", voice_id, emotion_tag, text[:100])
+    logger.info("═══ TTS EMOTION TEST (WebSocket) ═══  speaker=%s  emotion=%s  text=%s", voice_id, emotion_tag, text[:100])
 
-    audio_data = bytearray()
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("POST", VOLC_TTS_URL, json=payload, headers=headers) as resp:
-                if resp.status_code != 200:
-                    err_body = ""
-                    async for chunk in resp.aiter_text():
-                        err_body += chunk
-                        if len(err_body) > 500:
-                            break
-                    return JSONResponse(
-                        {"error": f"TTS API HTTP error: {resp.status_code}", "detail": err_body[:500]},
-                        status_code=502,
-                    )
-                async for line in resp.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    code = data.get("code", -1)
-                    if code == 20000000:
-                        break
-                    if code > 0:
-                        return JSONResponse({"error": f"TTS error {code}: {data.get('message', '')}"}, status_code=502)
-                    if code == 0 and data.get("data"):
-                        audio_data.extend(base64.b64decode(data["data"]))
-    except Exception as e:
+        audio_data = await _tts_request_via_websocket(session_config, final_text, resource_id)
+    except RuntimeError as e:
         return JSONResponse({"error": str(e)}, status_code=502)
 
     if not audio_data:
         return JSONResponse({"error": "empty audio"}, status_code=502)
 
-    return Response(content=bytes(audio_data), media_type="audio/mpeg",
+    return Response(content=audio_data, media_type="audio/mpeg",
                     headers={"Content-Disposition": "inline; filename=tts.mp3"})
 
 
@@ -1315,7 +1495,7 @@ def _parse_speech_rate(rate_str: str) -> int:
 
 @app.post("/api/tts/speak")
 async def tts_speak(request: Request):
-    """BytePlus Seed Speech V3 TTS — unidirectional HTTP streaming.
+    """BytePlus Bidirection TTS — 二进制协议 WebSocket。
 
     请求体参数:
         text (str): 要朗读的文本
@@ -1334,7 +1514,7 @@ async def tts_speak(request: Request):
 
     if not text.strip():
         return JSONResponse({"error": "text is required"}, status_code=400)
-    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_ID or not VOLC_TTS_ACCESS_KEY):
+    if not VOLC_TTS_API_KEY and (not VOLC_TTS_APP_KEY or not VOLC_TTS_ACCESS_KEY):
         return JSONResponse({"error": "TTS credentials not configured"}, status_code=500)
 
     final_text = _build_tts_text(text, voice_mode=voice_mode)
@@ -1342,64 +1522,49 @@ async def tts_speak(request: Request):
         return JSONResponse({"error": "no speakable content after cleanup"}, status_code=400)
 
     voice_info = _volc_voice_map.get(voice_id)
-    resource_id = voice_info["resource_id"] if voice_info else "volc.service_type.1000009"
+    resource_id = voice_info["resource_id"] if voice_info else _R10
 
-    # ── Extract voice instruction for emotion inference ──
     instruction, _ = _extract_voice_instruction(text)
     if not instruction and voice_mode:
         instruction = _infer_voice_instruction(final_text, user_context)
 
-    # ── V3 additions ──
+    # ── additions（jsonstring 格式） ──
     additions: dict = {
         "disable_markdown_filter": True,
         "enable_language_detector": True,
         "max_length_to_filter_parenthesis": 0,
     }
 
-    speech_rate = _parse_speech_rate(rate)
-    if speech_rate != 0:
-        additions["speech_rate"] = speech_rate
-
     context_texts = _build_context_texts(text, user_context, voice_mode)
     if context_texts:
         additions["context_texts"] = context_texts
 
-    # ── V3 audio_params with emotion ──
+    # ── audio_params ──
     audio_params: dict = {
         "format": "mp3",
         "sample_rate": 24000,
+        "bit_rate": 128000,
     }
+
+    speech_rate = _parse_speech_rate(rate)
+    if speech_rate != 0:
+        audio_params["speech_rate"] = speech_rate
 
     emotion = _infer_emotion(instruction or "", final_text, voice_info) if voice_mode else None
     if emotion:
         audio_params["emotion"] = emotion
 
-    # ── V3 request headers ──
-    headers: dict[str, str] = {
-        "X-Api-Resource-Id": resource_id,
-        "X-Api-App-Key": VOLC_TTS_APP_KEY,
-        "Content-Type": "application/json",
-        "Connection": "keep-alive",
-    }
-    if VOLC_TTS_API_KEY:
-        headers["X-Api-Key"] = VOLC_TTS_API_KEY
-    else:
-        headers["X-Api-App-Id"] = VOLC_TTS_APP_ID
-        headers["X-Api-Access-Key"] = VOLC_TTS_ACCESS_KEY
-
-    # ── V3 request body ──
-    payload = {
+    # ── session config（不含 text，text 通过 TaskRequest 单独发送） ──
+    session_config = {
         "user": {"uid": "playground_user"},
         "req_params": {
-            "text": final_text,
             "speaker": voice_id,
             "additions": json.dumps(additions),
             "audio_params": audio_params,
         },
     }
 
-    # ── Logging ──
-    logger.info("═══ TTS REQUEST ═══")
+    logger.info("═══ TTS REQUEST (Bidirection WS) ═══")
     logger.info("  Raw input text (first 200): %s", text[:200])
     logger.info("  Voice mode: %s | Speaker: %s | Resource-Id: %s", voice_mode, voice_id, resource_id)
     logger.info("  Extracted instruction: %s", instruction or "(none)")
@@ -1409,54 +1574,18 @@ async def tts_speak(request: Request):
     logger.info("  additions: %s", json.dumps(additions, ensure_ascii=False))
     logger.info("  audio_params: %s", audio_params)
 
-    # ── Stream response & collect audio chunks ──
-    audio_data = bytearray()
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream(
-                "POST", VOLC_TTS_URL, json=payload, headers=headers,
-            ) as resp:
-                if resp.status_code != 200:
-                    err_body = ""
-                    async for chunk in resp.aiter_text():
-                        err_body += chunk
-                        if len(err_body) > 500:
-                            break
-                    return JSONResponse(
-                        {"error": f"TTS API HTTP error: {resp.status_code}", "detail": err_body[:500]},
-                        status_code=502,
-                    )
-
-                async for line in resp.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-
-                    code = data.get("code", -1)
-                    if code == 20000000:
-                        break
-                    if code > 0:
-                        msg = data.get("message", "unknown error")
-                        return JSONResponse(
-                            {"error": f"TTS API error {code}: {msg}"},
-                            status_code=502,
-                        )
-                    if code == 0 and data.get("data"):
-                        audio_data.extend(base64.b64decode(data["data"]))
-
-    except httpx.TimeoutException:
+        audio_data = await _tts_request_via_websocket(session_config, final_text, resource_id)
+    except asyncio.TimeoutError:
         return JSONResponse({"error": "TTS API request timed out"}, status_code=504)
-    except Exception as e:
-        return JSONResponse({"error": f"TTS request failed: {e}"}, status_code=502)
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
 
     if not audio_data:
         return JSONResponse({"error": "TTS returned empty audio"}, status_code=502)
 
     return Response(
-        content=bytes(audio_data),
+        content=audio_data,
         media_type="audio/mpeg",
         headers={"Content-Disposition": "inline; filename=tts.mp3"},
     )
