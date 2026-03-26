@@ -1,0 +1,117 @@
+{
+  "config": {
+    "grid": {
+      "cols": 8,
+      "rows": 10
+    }
+  },
+  "resources": {
+    "basic": "basic.mp4",
+    "breast_oil play": "breast_oil play.mp4",
+    "leg_blowj": "leg_blowj.mp4",
+    "lips_lolipop": "lips_lolipop.mp4"
+  },
+  "states": {
+    "基础动作": {
+      "video": "basic",
+      "loop": true,
+      "next": null,
+      "on_click": [
+        {
+          "regions": [
+            [
+              3,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              3,
+              5
+            ],
+            [
+              3,
+              6
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              4,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              4,
+              6
+            ]
+          ],
+          "target": "摸胸-精油 play"
+        },
+        {
+          "regions": [
+            [
+              2,
+              3
+            ],
+            [
+              2,
+              4
+            ],
+            [
+              2,
+              5
+            ]
+          ],
+          "target": "摸嘴唇-舔棒棒糖"
+        },
+        {
+          "regions": [
+            [
+              5,
+              2
+            ],
+            [
+              6,
+              2
+            ],
+            [
+              6,
+              3
+            ],
+            [
+              6,
+              4
+            ]
+          ],
+          "target": "摸腿-口user手指"
+        }
+      ]
+    },
+    "摸胸-精油 play": {
+      "video": "breast_oil play",
+      "loop": false,
+      "next": "基础动作",
+      "on_click": []
+    },
+    "摸嘴唇-舔棒棒糖": {
+      "video": "lips_lolipop",
+      "loop": false,
+      "next": "基础动作",
+      "on_click": []
+    },
+    "摸腿-口user手指": {
+      "video": "leg_blowj",
+      "loop": false,
+      "next": "基础动作",
+      "on_click": []
+    }
+  },
+  "initialState": "基础动作"
+}

@@ -51,6 +51,8 @@
     .gen-btn:disabled{opacity:.5;cursor:not-allowed}
     .gen-btn.revise{background:var(--warning);color:#000}
     .gen-btn.revise:hover{background:#e3a831}
+    .gen-btn.download-btn{background:#4a9eff;flex-shrink:0}
+    .gen-btn.download-btn:hover{background:#3580db}
 
     .char-result{margin-top:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;max-height:500px;overflow-y:auto}
     .char-result-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;position:sticky;top:0;background:var(--bg);z-index:1;padding-bottom:4px}
@@ -300,6 +302,7 @@ function renderCard(card) {
         <div class="revise-row">
           <input class="gen-input revise-input" data-key="${esc(card.key)}" placeholder="修改指令（如：性格更冷酷）">
           <button class="gen-btn revise revise-btn" data-key="${esc(card.key)}">AI 修改</button>
+          <button class="gen-btn download-btn" data-key="${esc(card.key)}" title="下载当前版本 JSON">⬇ 下载</button>
         </div>
       </div>`;
   }
@@ -351,6 +354,9 @@ function bindCardEvents() {
   });
   document.querySelectorAll(".char-version-select").forEach(sel => {
     sel.addEventListener("change", () => switchVersion(sel.dataset.key, parseInt(sel.value)));
+  });
+  document.querySelectorAll(".download-btn").forEach(btn => {
+    btn.addEventListener("click", () => downloadCharJson(btn.dataset.key));
   });
 }
 
@@ -450,6 +456,29 @@ function switchVersion(key, version) {
   while (frag.firstChild) {
     container.insertBefore(frag.firstChild, reviseRow);
   }
+}
+
+function downloadCharJson(key) {
+  const ch = charMap[key];
+  if (!ch || !ch.versions || ch.versions.length === 0) return;
+
+  const sel = document.querySelector(`.char-version-select[data-key="${CSS.escape(key)}"]`);
+  const selectedVersion = sel ? parseInt(sel.value) : ch.versions[ch.versions.length - 1].version;
+  const ver = ch.versions.find(v => v.version === selectedVersion);
+  if (!ver || !ver.data) return;
+
+  const name = ver.data.name || ch.kol_name || "character";
+  const filename = `${name.replace(/[^\w\u4e00-\u9fff-]/g, "_")}_v${ver.version}.json`;
+
+  const blob = new Blob([JSON.stringify(ver.data, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function batchGenerate() {

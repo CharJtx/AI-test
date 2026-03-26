@@ -132,6 +132,53 @@
           </select>
         </div>
         <button id="btn-tts-emotion-test" style="margin-top:6px;width:100%;padding:6px 0;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer">🎭 Emotion A/B 测试</button>
+        <details id="tts-playground" style="margin-top:8px">
+          <summary style="font-size:11px;color:var(--text-muted);cursor:pointer;user-select:none">🧪 TTS Playground</summary>
+          <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+            <textarea id="tts-pg-text" rows="3" placeholder="输入要合成的文本…" style="width:100%;padding:6px 8px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);resize:vertical"></textarea>
+            <div class="char-field">
+              <label style="font-size:11px;color:var(--text-muted)">语气指令 context_texts（TTS 2.0）</label>
+              <input type="text" id="tts-pg-context" placeholder="例: 用温柔撒娇的语气说" style="width:100%;padding:4px 8px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius)">
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1">
+                <label style="font-size:10px;color:var(--text-muted)">Emotion</label>
+                <select id="tts-pg-emotion" style="width:100%;padding:3px 4px;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+                  <option value="">（不设置）</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label style="font-size:10px;color:var(--text-muted)">语速</label>
+                <input type="number" id="tts-pg-speed" value="0" min="-50" max="100" style="width:100%;padding:3px 4px;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+              </div>
+              <div style="flex:1">
+                <label style="font-size:10px;color:var(--text-muted)">音调</label>
+                <input type="number" id="tts-pg-pitch" value="0" min="-12" max="12" style="width:100%;padding:3px 4px;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <div style="flex:1">
+                <label style="font-size:10px;color:var(--text-muted)">语言</label>
+                <select id="tts-pg-lang" style="width:100%;padding:3px 4px;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+                  <option value="">自动</option>
+                  <option value="zh">中文</option>
+                  <option value="en">英文</option>
+                  <option value="ja">日文</option>
+                  <option value="crosslingual">多语言</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label style="font-size:10px;color:var(--text-muted)">格式</label>
+                <select id="tts-pg-format" style="width:100%;padding:3px 4px;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+                  <option value="mp3">MP3</option>
+                  <option value="ogg_opus">OGG Opus</option>
+                  <option value="pcm">PCM</option>
+                </select>
+              </div>
+            </div>
+            <button id="btn-tts-pg-play" style="width:100%;padding:7px 0;font-size:12px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:#fff;cursor:pointer;font-weight:600">▶ 合成并播放</button>
+          </div>
+        </details>
       </section>
 
       <!-- 生成参数：Temperature/TopP/MaxTokens/频率惩罚/存在惩罚 -->

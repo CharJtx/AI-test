@@ -361,7 +361,7 @@ function renderMessages(modelId) {
       const actions = isFinishedAssistant
         ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button></div>`
         : "";
-      const visualHint = (isFinishedAssistant && isVisuallyDense(m.content))
+      const visualHint = (isFinishedAssistant && m._showImgBtn)
         ? `<div class="visual-scene-hint"><button class="visual-hint-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}">✨ 这个画面很美，点击生成图片</button></div>`
         : "";
       return `<div class="message ${m.role}"><div class="content">${html}</div>${
@@ -656,7 +656,8 @@ function _wrapAsDialogue(text) {
  */
 function renderMarkdown(text) {
   try {
-    const cleaned = text.replace(/^\s*\[#[^\]]*\]\s*/, "");
+    let cleaned = text.replace(/^\s*\[#[^\]]*\]\s*/, "");
+    cleaned = cleaned.replace(/\n?\{\{IMG\}\}\s*$/, "");
     return renderRpContent(cleaned);
   } catch {
     return escapeHtml(text);
@@ -872,6 +873,15 @@ async function streamChat(modelId, params) {
   }
 
   delete state.conversations[modelId][msgIdx]._streaming;
+
+  // 检测并剥离 LLM 输出末尾的 {{IMG}} 标志位
+  const _imgTagRe = /\n?\{\{IMG\}\}\s*$/;
+  const _rawContent = state.conversations[modelId][msgIdx].content;
+  if (_imgTagRe.test(_rawContent)) {
+    state.conversations[modelId][msgIdx].content = _rawContent.replace(_imgTagRe, "").trimEnd();
+    state.conversations[modelId][msgIdx]._showImgBtn = true;
+  }
+
   renderMessages(modelId);
 
   if (document.getElementById("rp-format-mode")?.value === "voice") {
@@ -2117,6 +2127,96 @@ function openCharEditor(existingChar) {
     renderCharInfo();
   });
 }
+
+// ── TTS Playground ───────────────────────────────────────
+(function initTtsPlayground() {
+  const btnPlay = document.getElementById("btn-tts-pg-play");
+  if (!btnPlay) return;
+
+  // 填充 emotion 下拉
+  (async () => {
+    try {
+      const r = await fetch("/api/tts/emotions");
+      const { emotions } = await r.json();
+      const sel = document.getElementById("tts-pg-emotion");
+      for (const e of emotions) {
+        const opt = document.createElement("option");
+        opt.value = e;
+        opt.textContent = e;
+        sel.appendChild(opt);
+      }
+    } catch {}
+  })();
+
+  let _pgAudio = null;
+
+  btnPlay.addEventListener("click", async () => {
+    const text = document.getElementById("tts-pg-text")?.value?.trim();
+    if (!text) { alert("请输入文本"); return; }
+
+    // 如果正在播放，先停止
+    if (_pgAudio) {
+      _pgAudio.pause();
+      if (_pgAudio.src) URL.revokeObjectURL(_pgAudio.src);
+      _pgAudio = null;
+      btnPlay.textContent = "▶ 合成并播放";
+      return;
+    }
+
+    const voice = getTtsVoice();
+    if (!voice) { alert("请先在上方选择音色"); return; }
+
+    const context = document.getElementById("tts-pg-context")?.value?.trim();
+    const emotion = document.getElementById("tts-pg-emotion")?.value || "";
+    const speechRate = parseInt(document.getElementById("tts-pg-speed")?.value) || 0;
+    const pitchRate = parseInt(document.getElementById("tts-pg-pitch")?.value) || 0;
+    const lang = document.getElementById("tts-pg-lang")?.value || "";
+    const fmt = document.getElementById("tts-pg-format")?.value || "mp3";
+
+    const payload = { text, voice, format: fmt, speech_rate: speechRate, pitch_rate: pitchRate };
+    if (context) payload.context_texts = context;
+    if (emotion) payload.emotion = emotion;
+    if (lang) payload.explicit_language = lang;
+
+    btnPlay.disabled = true;
+    btnPlay.textContent = "⏳ 合成中…";
+
+    try {
+      const resp = await fetch("/api/tts/speak-raw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${resp.status}`);
+      }
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      _pgAudio = new Audio(url);
+
+      btnPlay.disabled = false;
+      btnPlay.textContent = "⏹ 停止播放";
+
+      _pgAudio.addEventListener("ended", () => {
+        URL.revokeObjectURL(url);
+        _pgAudio = null;
+        btnPlay.textContent = "▶ 合成并播放";
+      });
+      _pgAudio.addEventListener("error", () => {
+        URL.revokeObjectURL(url);
+        _pgAudio = null;
+        btnPlay.textContent = "▶ 合成并播放";
+      });
+      _pgAudio.play();
+    } catch (e) {
+      alert("TTS 合成失败: " + e.message);
+      btnPlay.disabled = false;
+      btnPlay.textContent = "▶ 合成并播放";
+    }
+  });
+})();
 
 // ── TTS Emotion A/B 测试 ─────────────────────────────────
 (function initEmotionTest() {
