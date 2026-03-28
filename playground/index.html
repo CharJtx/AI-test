@@ -59,12 +59,12 @@
     }
 
     async function loadScene(name) {
-      const baseUrl = `scenes/${encodeURIComponent(name)}/`;
-      const jsonUrl = baseUrl + 'scene-data.json';
+      const enc = encodeURIComponent(name);
+      const baseUrl = `/scenes-data/${enc}/`;
 
       try {
-        const resp = await fetch(jsonUrl);
-        if (!resp.ok) throw new Error(`无法加载 ${jsonUrl} (${resp.status})`);
+        const resp = await fetch(`/api/playground/scenes/${enc}/data`);
+        if (!resp.ok) throw new Error(`无法加载场景 ${name} (${resp.status})`);
         const data = await resp.json();
 
         document.title = `${name} - Interactive Player`;
@@ -82,7 +82,7 @@
         const { scenes } = await resp.json();
 
         if (scenes.length === 0) {
-          app.innerHTML = `<div class="scene-selector"><h1>暂无场景</h1><p style="color:#555">在 playground/scenes/ 下创建子目录并放入 scene-data.json</p></div>`;
+          app.innerHTML = `<div class="scene-selector"><h1>暂无场景</h1><p style="color:#555">在编辑器中创建场景，或通过 API 上传 scene-data.json</p></div>`;
           return;
         }
 
@@ -93,7 +93,7 @@
               ${scenes.map(s => `
                 <a class="scene-card" href="?scene=${encodeURIComponent(s)}">
                   <div class="name">${s}</div>
-                  <div class="path">scenes/${s}/</div>
+                  <div class="path">${s}</div>
                 </a>
               `).join('')}
             </div>

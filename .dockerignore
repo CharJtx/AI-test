@@ -1,0 +1,25 @@
+.git
+.gitignore
+.env
+.venv
+venv
+__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+.vscode
+.idea
+.cursor
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 运行时数据不打入镜像，由外部卷提供
+data/chats.json
+playground/scenes/**/*.mp4
+playground/scenes/**/*.webm
+playground/scenes/**/*.mov
+playground/scenes/**/*.avi

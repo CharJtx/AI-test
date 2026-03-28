@@ -59,7 +59,11 @@ class NoCacheStaticMiddleware(BaseHTTPMiddleware):
 app.add_middleware(NoCacheStaticMiddleware)
 
 # ── 数据文件路径与常量 ──────────────────────────────────────
-DATA_DIR = Path("data")
+# 可通过环境变量覆盖持久化目录，便于容器部署时挂载数据卷。
+DATA_DIR = Path(os.getenv("APP_DATA_DIR", "data"))
+SCENES_DIR = Path(os.getenv("APP_SCENES_DIR", "playground/scenes"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+SCENES_DIR.mkdir(parents=True, exist_ok=True)
 PRESETS_FILE = DATA_DIR / "presets.json"       # 推理参数预设
 WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
 CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
@@ -2601,8 +2605,6 @@ async def import_character(file: UploadFile = File(...)):
 # Playground 是独立的实验页面，每个场景对应一个目录，
 # 包含 scene-data.json 配置文件和视频等媒体资源。
 
-SCENES_DIR = Path("playground/scenes")
-
 
 @app.get("/api/playground/scenes")
 async def list_playground_scenes():
@@ -2680,6 +2682,25 @@ async def upload_scene_resource(name: str, file: UploadFile = File(...)):
     content = await file.read()
     dest.write_bytes(content)
     return {"name": file.filename, "size": len(content)}
+
+
+@app.get("/api/playground/scenes/{name}/resources/{filename}")
+async def download_scene_resource(name: str, filename: str):
+    """下载单个场景资源文件（防路径穿越）。大文件建议走 /scenes-data/ 静态挂载。"""
+    if ".." in filename or "/" in filename or "\\" in filename:
+        return JSONResponse({"error": "invalid filename"}, status_code=400)
+    target = SCENES_DIR / name / filename
+    if not target.exists() or not target.is_file():
+        return JSONResponse({"error": "file not found"}, status_code=404)
+    suffix = target.suffix.lower()
+    media_types = {
+        ".mp4": "video/mp4", ".webm": "video/webm",
+        ".mov": "video/quicktime", ".avi": "video/x-msvideo",
+        ".json": "application/json", ".png": "image/png",
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    }
+    media_type = media_types.get(suffix, "application/octet-stream")
+    return Response(target.read_bytes(), media_type=media_type)
 
 
 @app.delete("/api/playground/scenes/{name}/resources")
@@ -3047,8 +3068,15 @@ async def revise_kol_character(request: Request):
     return JSONResponse({"item": entry}, headers={"Cache-Control": "no-store"})
 
 
-# ── 静态文件托管 ────────────────────────────────────────────
-# 挂载顺序重要：/playground 必须在 / 之前，否则会被根路由拦截
+@app.get("/healthz")
+async def healthz():
+    """容器健康检查端点。"""
+    return {"ok": True}
 
+
+# ── 静态文件托管 ────────────────────────────────────────────
+# 挂载顺序重要：更具体的路径在前，/ 在最后
+# /scenes-data 指向 SCENES_DIR（可能是外部持久卷），支持 Range 请求和视频拖拽
+app.mount("/scenes-data", StaticFiles(directory=str(SCENES_DIR)), name="scene-data-files")
 app.mount("/playground", StaticFiles(directory="playground", html=True), name="playground")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

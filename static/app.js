@@ -359,7 +359,7 @@ function renderMessages(modelId) {
       const html = renderMarkdown(m.content);
       const isFinishedAssistant = m.role === "assistant" && !m._streaming;
       const actions = isFinishedAssistant
-        ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button></div>`
+        ? `<div class="msg-actions"><button class="msg-action-btn img-prompt-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="生成文生图 Prompt">🎨</button><button class="msg-action-btn tts-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="朗读">🔊</button><button class="msg-action-btn tts-download-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}" title="下载语音 MP3">⬇️</button></div>`
         : "";
       const visualHint = (isFinishedAssistant && m._showImgBtn)
         ? `<div class="visual-scene-hint"><button class="visual-hint-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}">✨ 这个画面很美，点击生成图片</button></div>`
@@ -406,6 +406,24 @@ function renderMessages(modelId) {
         }
       }
       speakText(text, btn, { voiceMode: isVoice, userContext: userCtx });
+    });
+  });
+
+  container.querySelectorAll(".tts-download-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mid = btn.dataset.model;
+      const i = parseInt(btn.dataset.idx);
+      const conv = state.conversations[mid] || [];
+      const text = conv[i]?.content;
+      if (!text) return;
+      const isVoice = document.getElementById("rp-format-mode")?.value === "voice";
+      let userCtx = "";
+      if (isVoice) {
+        for (let j = i - 1; j >= 0; j--) {
+          if (conv[j]?.role === "user") { userCtx = conv[j].content; break; }
+        }
+      }
+      downloadTtsAudio(text, btn, { voiceMode: isVoice, userContext: userCtx });
     });
   });
 
@@ -575,6 +593,51 @@ async function speakText(text, btn, { voiceMode = false, userContext = "" } = {}
     alert("语音合成失败: " + e.message);
     btn.disabled = false;
     btn.textContent = "🔊";
+  }
+}
+
+/**
+ * 调用 TTS 接口合成语音并以 MP3 文件下载。
+ */
+async function downloadTtsAudio(text, btn, { voiceMode = false, userContext = "" } = {}) {
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "⏳";
+
+  try {
+    const payload = {
+      text,
+      voice: getTtsVoice(),
+      rate: getTtsRate(),
+      voice_mode: voiceMode,
+      user_context: userContext,
+    };
+    const resp = await fetch("/api/tts/speak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const charName = document.getElementById("char-select")?.selectedOptions?.[0]?.textContent?.trim() || "voice";
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    a.href = url;
+    a.download = `${charName}_${ts}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) {
+    alert("语音下载失败: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
   }
 }
 
