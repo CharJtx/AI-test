@@ -485,15 +485,20 @@ async function loadTtsVoices() {
     const resp = await fetch("/api/tts/voices");
     const { voices } = await resp.json();
 
+    const localeLabels = {
+      en: "🇺🇸 English",
+      ja: "🇯🇵 Japanese",
+      zh: "🇨🇳 Chinese",
+      es: "🇲🇽 Spanish",
+      id: "🇮🇩 Indonesian",
+      pt: "🇧🇷 Portuguese",
+    };
     const groups = {};
     for (const v of voices) {
       let group;
       if (v.locale === "multi" && v.id.startsWith("S_")) group = "🎭 InSnap Custom";
       else if (v.locale === "multi") group = "🌐 Multilingual";
-      else if (v.locale.startsWith("en-")) group = "🇺🇸 English";
-      else if (v.locale.startsWith("ja-")) group = "🇯🇵 Japanese";
-      else if (v.locale.startsWith("zh-")) group = "🇨🇳 Chinese";
-      else group = v.locale;
+      else group = localeLabels[v.locale] || v.locale;
       if (!groups[group]) groups[group] = [];
       groups[group].push(v);
     }

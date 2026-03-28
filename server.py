@@ -876,114 +876,53 @@ _R20 = "seed-tts-2.0"              # TTS 2.0 (supports context_texts)
 _RMG = "volc.megatts.default"      # Voice Replication
 
 VOLC_TTS_VOICES = [
-    # ═══════════════════ TTS 2.0 Female (English) ═══════════════════
-    {"id": "en_female_stokie_uranus_bigtts",  "name": "Stokie (Clear)",  "locale": "en-US", "gender": "Female", "resource_id": _R20},
-    {"id": "en_female_dacey_uranus_bigtts",   "name": "Dacey (Sweet)",   "locale": "en-US", "gender": "Female", "resource_id": _R20},
-    # ═══════════════════ TTS 2.0 Female (Japanese) ═══════════════════
-    {"id": "jp_female_minimi_uranus_bigtts",   "name": "Minimi (Clear)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R20},
-    # ═══════════════════ TTS 2.0 Female (Chinese / Multi) ═══════════════════
-    {"id": "zh_female_vv_uranus_bigtts",              "name": "Vivi (Vivid)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-    {"id": "zh_female_xiaohe_uranus_bigtts",          "name": "Mindy (Vivid)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-    {"id": "zh_female_kefunvsheng_uranus_bigtts",     "name": "Tracy (Warm)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-    {"id": "zh_female_linjianvhai_uranus_bigtts",     "name": "Pinky (Sweet)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-    {"id": "zh_female_kiwi_uranus_bigtts",            "name": "Sweety (Vivid)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-    {"id": "zh_female_sajiaoxuemei_uranus_bigtts",    "name": "Sandy (Sweet)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R20},
-
-    # ═══════════════════ TTS 1.0 Female — Emotion (English) ═══════════════════
-    {"id": "en_female_candice_emo_v2_mars_bigtts",      "name": "Candice (Warm)",    "locale": "en-US", "gender": "Female", "resource_id": _R10,
-     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm"]},
-    {"id": "en_female_skye_emo_v2_mars_bigtts",         "name": "Serena (Vivid)",    "locale": "en-US", "gender": "Female", "resource_id": _R10,
-     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm", "sad"]},
-    {"id": "en_female_nadia_tips_emo_v2_mars_bigtts",   "name": "Nadia (Sweet)",     "locale": "en-GB", "gender": "Female", "resource_id": _R10,
-     "emotions": ["affectionate", "angry", "ASMR", "chat", "excited", "happy", "neutral", "warm", "sad"]},
-
-    # ═══════════════════ TTS 1.0 Female — General (American English) ═══════════════════
-    {"id": "en_female_anna_mars_bigtts",                "name": "Anna (Soft)",           "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_lauren_moon_bigtts",              "name": "Lauren (Vivid)",        "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_product_darcie_moon_bigtts",      "name": "Flirty Female (Warm)",  "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_emotional_moon_bigtts",           "name": "Peaceful (Sweet)",      "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_nara_moon_bigtts",                "name": "Nara (Deep)",           "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_sophie_conversation_wvae_bigtts", "name": "Sophie (Warm)",         "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_dacey_conversation_wvae_bigtts",  "name": "Daisy (Clear)",         "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_sarah_new_conversation_wvae_bigtts", "name": "Luna (Elegant)",     "locale": "en-US", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_en_female_cc_cm_v1_tob",                "name": "Charlie (Vivid)",       "locale": "en-US", "gender": "Female", "resource_id": _R10},
-
-    # ═══════════════════ TTS 1.0 Female — General (British / Australian English) ═══════════════════
-    {"id": "en_female_daisy_moon_bigtts",    "name": "Delicate Girl (Clear)", "locale": "en-GB", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_onez_moon_bigtts",     "name": "Onez (Soft)",           "locale": "en-GB", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_emily_mars_bigtts",    "name": "Emily (Soft)",          "locale": "en-GB", "gender": "Female", "resource_id": _R10},
-    {"id": "en_female_sarah_mars_bigtts",    "name": "Sarah (Soft)",          "locale": "en-AU", "gender": "Female", "resource_id": _R10},
-
-    # ═══════════════════ TTS 1.0 Female — Emotion (English & Chinese) ═══════════════════
-    {"id": "zh_female_shuangkuaisisi_emo_v2_mars_bigtts", "name": "Elena (Vivid)", "locale": "multi", "gender": "Female", "resource_id": _R10,
-     "emotions": ["happy", "sad", "angry", "surprised", "excited", "coldness", "neutral"]},
-
-    # ═══════════════════ TTS 1.0 Female — General (English & Chinese) ═══════════════════
-    {"id": "zh_female_shaoergushi_mars_bigtts",    "name": "Tina (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_jitangmeimei_mars_bigtts",   "name": "Grace (Soft)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_tiexinnvsheng_mars_bigtts",  "name": "Sophia (Warm)",   "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_qiaopinvsheng_mars_bigtts",  "name": "Mia (Vivid)",     "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_mengyatou_mars_bigtts",      "name": "Ava (Vivid)",     "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_cancan_mars_bigtts",         "name": "Luna (Clear)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_qingxinnvsheng_mars_bigtts", "name": "Olivia (Clear)",  "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_linjia_mars_bigtts",         "name": "Lily (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_shuangkuaisisi_moon_bigtts", "name": "Aria (Vivid)",    "locale": "multi", "gender": "Female", "resource_id": _R10},
-
-    # ═══════════════════ TTS 1.0 Female — Emotion (Chinese) ═══════════════════
-    {"id": "zh_female_tianxinxiaomei_emo_v2_mars_bigtts",  "name": "甜心小美 (Sweet)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
-     "emotions": ["sad", "fear", "hate", "neutral"]},
-    {"id": "zh_female_gaolengyujie_emo_v2_mars_bigtts",   "name": "高冷御姐 (Mature)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
-     "emotions": ["happy", "sad", "fear", "hate", "neutral", "angry", "surprised", "excited", "coldness"]},
-    {"id": "zh_female_linjuayi_emo_v2_mars_bigtts",       "name": "邻居阿姨 (Soft)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10,
-     "emotions": ["neutral", "angry", "coldness", "depressed", "surprised"]},
-
-    # ═══════════════════ TTS 1.0 Female — Flirt (Chinese) ═══════════════════
-    {"id": "zh_female_jiaochuan_mars_bigtts",               "name": "娇喘女声 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_flattery_mars_bigtts",                "name": "谄媚女声 (Vivid)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_chunzhenshaonv_e588402fb8ad_tob", "name": "纯真少女 (Mature)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_ganli_v1_tob",                    "name": "妩媚可人 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_xiangliangya_v1_tob",             "name": "邪魅御姐 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_bingjiao3_tob",                   "name": "邪魅女王 (Charming)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_meilinvyou_moon_bigtts",              "name": "魅力女友 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_sajiaonvyou_moon_bigtts",             "name": "柔美女友 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_yuanqinvyou_moon_bigtts",             "name": "撒娇学妹 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_bingruoshaonv_tob",               "name": "病弱少女 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_jiaoruoluoli_tob",                "name": "娇弱萝莉 (Sweet)",    "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_bingjiaomengmei_tob",             "name": "病娇萌妹 (Sexy)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_aojiaonvyou_tob",                 "name": "傲娇女友 (Scheming)", "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "ICL_zh_female_tiexinnvyou_tob",                 "name": "贴心女友 (Warm)",     "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-
-    # ═══════════════════ TTS 1.0 Female — General (Chinese) ═══════════════════
-    {"id": "zh_female_wenroushunv_mars_bigtts",   "name": "温柔淑女 (Soft)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_gaolengyujie_moon_bigtts",  "name": "高冷御姐 (Clear)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_linjianvhai_moon_bigtts",   "name": "邻家女孩 (Clear)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_yueyunv_mars_bigtts",       "name": "温柔粤语 (Warm)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_daimengchuanmei_moon_bigtts","name": "呆萌川妹 (Cute)",   "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-    {"id": "zh_female_wanwanxiaohe_moon_bigtts",  "name": "台湾小何 (Vivid)",  "locale": "zh-CN", "gender": "Female", "resource_id": _R10},
-
-    # ═══════════════════ TTS 1.0 Female — Japanese ═══════════════════
-    {"id": "multi_female_shuangkuaisisi_moon_bigtts",        "name": "はるこ Haruko (Vivid)", "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
-    {"id": "multi_female_gaolengyujie_moon_bigtts",          "name": "あけみ Akemi (Clear)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
-    {"id": "multi_female_sophie_conversation_wvae_bigtts",   "name": "さとみ Satomi (Soft)",  "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
-    {"id": "multi_female_maomao_conversation_wvae_bigtts",   "name": "つき Tsuki (Clear)",    "locale": "ja-JP", "gender": "Female", "resource_id": _R10},
+    # ═══════════════════ TTS 2.0 Female ═══════════════════
+    {"id": "zh_female_vv_uranus_bigtts",              "name": "Vivi (Vivid)",     "locales": ["en", "ja", "es", "id", "zh"], "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_xiaohe_uranus_bigtts",          "name": "Mindy (Vivid)",    "locales": ["en", "es", "id", "pt", "zh"], "gender": "Female", "resource_id": _R20},
+    {"id": "en_female_stokie_uranus_bigtts",          "name": "Stokie (Clear)",   "locales": ["en"],                         "gender": "Female", "resource_id": _R20},
+    {"id": "en_female_dacey_uranus_bigtts",           "name": "Dacey (Sweet)",    "locales": ["en"],                         "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_vivo_uranus_bigtts",            "name": "Vienna (Clear)",   "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_xiaoai_uranus_bigtts",          "name": "Alina (Clear)",    "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_dabing_uranus_bigtts",          "name": "Bonnie (Clear)",   "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_qingxinnvsheng_uranus_bigtts",  "name": "Celeste (Clear)",  "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_cancan_uranus_bigtts",          "name": "Corinne (Vivid)",  "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_sajiaoxuemei_uranus_bigtts",    "name": "Dolly (Sweet)",    "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_tianmeixiaoyuan_uranus_bigtts",  "name": "Esther (Sweet)",  "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_tianmeitaozi_uranus_bigtts",    "name": "Freya (Sweet)",    "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_shuangkuaisisi_uranus_bigtts",  "name": "Gigi (Vivid)",     "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_peiqi_uranus_bigtts",           "name": "Holly (Cute)",     "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_linjianvhai_uranus_bigtts",     "name": "Ivy (Sweet)",      "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_yingyujiaoxue_uranus_bigtts",   "name": "Jean (Warm)",      "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_xiaoxue_uranus_bigtts",         "name": "Lyla (Warm)",      "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_mizai_uranus_bigtts",           "name": "Mabel (Sweet)",    "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_jitangnv_uranus_bigtts",        "name": "Nadia (Warm)",     "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_meilinvyou_uranus_bigtts",      "name": "Opal (Charming)",  "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_liuchangnv_uranus_bigtts",      "name": "Pearl (Clear)",    "locales": ["en", "zh"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_kefunvsheng_uranus_bigtts",     "name": "Tracy (Warm)",     "locales": ["en", "es", "zh"],             "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_kiwi_uranus_bigtts",            "name": "Sweety (Vivid)",   "locales": ["ja", "es"],                   "gender": "Female", "resource_id": _R20},
+    {"id": "jp_female_minimi_uranus_bigtts",           "name": "Minimi (Clear)",   "locales": ["ja"],                         "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_linjianvhai_uranus_bigtts",     "name": "Pinky (Sweet)",    "locales": ["es"],                         "gender": "Female", "resource_id": _R20},
+    {"id": "zh_female_sajiaoxuemei_uranus_bigtts",    "name": "Sandy (Sweet)",    "locales": ["es"],                         "gender": "Female", "resource_id": _R20},
 
     # ═══════════════════ InSnap Custom (Voice Replication) ═══════════════════
-    {"id": "S_RGTt9JrD1", "name": "KittyKi",        "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_HvAt9JrD1", "name": "Makima",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_D9oEZIrD1", "name": "Evelyn",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_VS8vZIrD1", "name": "Ashley",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_52VuZIrD1", "name": "Sofia",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_1YTuZIrD1", "name": "Yulia",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_73FuZIrD1", "name": "Warm Voice",      "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_xm4caKqD1", "name": "Magnetic Voice",  "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_lYsxK5IC1", "name": "Sweet Voice",     "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_xgb9isQD1", "name": "Sexy On Bed",     "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_rfcVkzUP1", "name": "Ariana",          "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_5mlrvs5Q1", "name": "Narration Only",  "locale": "multi", "gender": "Female", "resource_id": _RMG},
-    {"id": "S_frvOUiuQ1", "name": "Alice",           "locale": "multi", "gender": "Female", "resource_id": _RMG},
+    {"id": "S_RGTt9JrD1", "name": "KittyKi",        "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_HvAt9JrD1", "name": "Makima",          "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_D9oEZIrD1", "name": "Evelyn",          "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_VS8vZIrD1", "name": "Ashley",          "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_52VuZIrD1", "name": "Sofia",           "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_1YTuZIrD1", "name": "Yulia",           "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_73FuZIrD1", "name": "Warm Voice",      "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_xm4caKqD1", "name": "Magnetic Voice",  "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_lYsxK5IC1", "name": "Sweet Voice",     "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_xgb9isQD1", "name": "Sexy On Bed",     "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_rfcVkzUP1", "name": "Ariana",          "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_5mlrvs5Q1", "name": "Narration Only",  "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
+    {"id": "S_frvOUiuQ1", "name": "Alice",           "locales": ["multi"], "gender": "Female", "resource_id": _RMG},
 ]
 
-_volc_voice_map: dict[str, dict] = {v["id"]: v for v in VOLC_TTS_VOICES}
+_volc_voice_map: dict[str, dict] = {}
+for _v in VOLC_TTS_VOICES:
+    _volc_voice_map.setdefault(_v["id"], _v)
 
 
 # ── BytePlus Bidirection TTS 二进制协议常量 ──────────────────
@@ -1204,13 +1143,12 @@ async def _tts_request_via_websocket(
 
 @app.get("/api/tts/voices")
 async def list_tts_voices():
-    """返回所有可用的火山引擎 TTS 音色列表。"""
-    return {
-        "voices": [
-            {"id": v["id"], "name": v["name"], "locale": v["locale"], "gender": v["gender"]}
-            for v in VOLC_TTS_VOICES
-        ]
-    }
+    """返回所有可用的火山引擎 TTS 音色列表，多语言音色会展开到每个语言标签下。"""
+    voices = []
+    for v in VOLC_TTS_VOICES:
+        for loc in v.get("locales", ["multi"]):
+            voices.append({"id": v["id"], "name": v["name"], "locale": loc, "gender": v["gender"]})
+    return {"voices": voices}
 
 
 TTS_ALL_EMOTIONS = [

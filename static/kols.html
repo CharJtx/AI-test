@@ -467,10 +467,19 @@ function downloadCharJson(key) {
   const ver = ch.versions.find(v => v.version === selectedVersion);
   if (!ver || !ver.data) return;
 
+  const exportObj = {
+    key: ch.key,
+    profile_id: ch.profile_id,
+    outfit_code: ch.outfit_code,
+    image_url: ch.image_url,
+    kol_name: ch.kol_name,
+    versions: [ver],
+  };
+
   const name = ver.data.name || ch.kol_name || "character";
   const filename = `${name.replace(/[^\w\u4e00-\u9fff-]/g, "_")}_v${ver.version}.json`;
 
-  const blob = new Blob([JSON.stringify(ver.data, null, 2)], {type: "application/json"});
+  const blob = new Blob([JSON.stringify(exportObj, null, 2)], {type: "application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
