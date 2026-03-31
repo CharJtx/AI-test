@@ -218,7 +218,7 @@ Given user-provided keywords/concepts, generate a COMPLETE character card in JSO
 
 Requirements:
 1. All text fields should be rich, detailed, and psychologically nuanced.
-2. The character_book must contain 15-25 entries covering: core identity, relationships, psychology, environment, behaviors, speech patterns, and intimate dynamics.
+2. The character_book must contain 25-40 entries covering: core identity, detailed appearance breakdown (hair, eyes, body, clothing style), relationships, psychology/inner conflicts, environment/daily life, behaviors/habits, speech patterns/verbal tics, intimate dynamics, sexual kinks/preferences, emotional triggers, backstory details, and hidden personality facets.
 3. Each character_book entry needs relevant trigger keywords.
 4. Use {{char}} for the character's name and {{user}} for the user in all text fields.
 5. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
@@ -252,8 +252,8 @@ Return ONLY valid JSON with this exact structure (no markdown, no explanation):
   "character_book": {
     "name": "string",
     "description": "string",
-    "scan_depth": 2,
-    "token_budget": 512,
+    "scan_depth": 4,
+    "token_budget": 2048,
     "recursive_scanning": true,
     "extensions": {},
     "entries": [
@@ -370,7 +370,7 @@ async def generate_character(request: Request):
                     )},
                 ],
                 "temperature": 0.9,
-                "max_tokens": 16000,
+                "max_tokens": 32000,
             },
             headers={
                 "Authorization": f"Bearer {get_api_key()}",
@@ -430,15 +430,15 @@ Your task: Transform the character card according to the instructions while pres
 
 Rules:
 1. Naturally integrate the requested changes into ALL relevant fields (description, personality, scenario, first_mes, mes_example, system_prompt, character_book).
-2. Update the character_book: modify existing entries that relate to the changes, and ADD new entries (2-5) specifically covering the new traits/themes.
+2. Update the character_book: modify existing entries that relate to the changes, and ADD new entries (5-10) specifically covering the new traits/themes. Ensure the total character_book has at least 25 entries after remixing.
 3. CRITICAL for character_book entry "content" field — write in NATURAL, descriptive prose:
-   - Each entry MUST be 2-4 complete, grammatically correct sentences that read like a writer's reference note.
+   - Each entry MUST be 3-6 complete, grammatically correct sentences that read like a writer's detailed reference note.
    - NEVER use compressed telegram-style fragments that omit subjects, verbs, or connectives.
    - BAD (Chinese): "{{char}}享受辣妹受欢迎，却厌伪装疲惫，渴望{{user}}爱真我。"
-   - GOOD (Chinese): "{{char}}其实很享受辣妹身份带来的人气和关注，但长期维持这个人设让她越来越疲惫。她内心深处渴望{{user}}能看到卸下伪装后真实的自己，而不只是那个永远在笑的辣妹。"
+   - GOOD (Chinese): "{{char}}其实很享受辣妹身份带来的人气和关注，但长期维持这个人设让她越来越疲惫。每当夜深人静一个人回到家，她会卸掉所有妆容，穿上松垮的旧T恤，蜷在沙发上看老动画片。她内心深处渴望{{user}}能看到卸下伪装后真实的自己，而不只是那个永远在笑的辣妹。"
    - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
-   - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
-   - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
+   - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. On nights when she's alone, she peels off her lashes, ties her hair in a messy bun, and watches comfort shows in oversized sweats. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
+   - Think of each entry as a richly detailed mini-paragraph with specific behaviors, emotional reactions, and situational details.
 4. Rewrite first_mes to reflect the changes while keeping the same immersive narrative scene style:
    - Set atmosphere through environmental details
    - Reveal traits INDIRECTLY through actions and dialogue
@@ -463,16 +463,17 @@ Requirements:
    Vary occupations widely (office worker, teacher, athlete, doctor, artist, CEO, barista, detective, idol trainee, single mother, etc.) and relationships to {{user}} (childhood friend, boss-secretary, neighbor, stranger met at bar, gym trainer, rival, landlord-tenant, etc.).
 3. Automatically infer and create 2-3 natural, fitting sexual kinks (XP elements) based on visual cues: pose, clothing state, body language, expression, setting, and overall vibe. 
    Make kinks diverse and integrated into personality/background (examples: light bondage + praise kink, foot fetish + gentle femdom, size difference + breeding kink, voyeurism + exhibitionism, scent play + power exchange, etc.). Never force the same kinks; let the image guide unique combinations.
-4. The character_book must contain 18-25 entries covering: appearance details, core identity, occupation/background, relationships, psychology, environment, behaviors, speech patterns, intimate dynamics, AND explicit sexual kinks/preferences.
+4. The character_book must contain 30-45 entries covering: appearance details (separate entries for hair, eyes, face, body proportions, clothing style, accessories), core identity, occupation/background, daily routine, relationships with {{user}} and others, psychology/inner conflicts, emotional triggers, environment/living space, behaviors/habits/mannerisms, speech patterns/verbal tics, intimate dynamics, explicit sexual kinks/preferences (at least 3-4 separate kink entries), hidden desires, and character growth potential.
 5. Each character_book entry needs relevant trigger keywords.
 6. Use {{char}} for the character's name and {{user}} for the user in all text fields.
-7. The mes_example should contain 2-3 realistic example exchanges using <START> separators.
+7. The mes_example should contain 3-4 realistic example exchanges using <START> separators, showcasing different emotional states and interaction dynamics.
 8. If the user provides supplementary notes, incorporate them into the character design.
 9. Write ALL content in the SAME language as any user-provided text (default to English if no text given).
 10. CRITICAL for character_book entry "content" field — write in NATURAL, descriptive prose:
-    - Each entry MUST be 2-4 complete, grammatically correct sentences that read like a writer's reference note.
+    - Each entry MUST be 3-6 complete, grammatically correct sentences that read like a writer's detailed reference note.
     - NEVER use compressed telegram-style fragments.
-    - For kink entries specifically: describe the kink in vivid but natural prose, explain how it ties to her personality/background, and how it manifests with {{user}}.
+    - For kink entries specifically: describe the kink in vivid but natural prose, explain how it ties to her personality/background, how it manifests with {{user}}, and include specific behavioral details or scenarios.
+    - For appearance entries: go beyond listing features — describe how they move, how light catches them, what they reveal about the character's mood or personality.
 11.. CRITICAL for first_mes: Write a vivid but NATURAL opening scene. Balance detail with conversational flow:
    - Open with the character in the middle of an action — adjusting clothes, leaning against something, glancing at {{user}} — not with a paragraph of setting description
    - Weave in SPECIFIC visual details naturally: clothing state (strap slipping, shirt half-unbuttoned, skirt riding up), body language (how they sit/stand/move), small habitual gestures
@@ -540,7 +541,7 @@ async def generate_character_from_image(
                     {"role": "user", "content": user_content},
                 ],
                 "temperature": 0.9,
-                "max_tokens": 16000,
+                "max_tokens": 32000,
             },
             headers={
                 "Authorization": f"Bearer {get_api_key()}",
@@ -626,7 +627,7 @@ async def remix_character(request: Request):
                     {"role": "user", "content": user_msg},
                 ],
                 "temperature": 0.85,
-                "max_tokens": 16000,
+                "max_tokens": 32000,
             },
             headers={
                 "Authorization": f"Bearer {get_api_key()}",
@@ -2924,7 +2925,7 @@ async def generate_kol_character(request: Request):
                     {"role": "user", "content": user_content},
                 ],
                 "temperature": 0.9,
-                "max_tokens": 16000,
+                "max_tokens": 32000,
             },
             headers={
                 "Authorization": f"Bearer {get_api_key()}",
@@ -3021,7 +3022,7 @@ async def revise_kol_character(request: Request):
                     {"role": "user", "content": user_msg},
                 ],
                 "temperature": 0.85,
-                "max_tokens": 16000,
+                "max_tokens": 32000,
             },
             headers={
                 "Authorization": f"Bearer {get_api_key()}",
