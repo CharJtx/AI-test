@@ -7,25 +7,25 @@ description: Operate the Muvee self-hosted PaaS via the muveectl CLI. Manages pr
 
 ## Installation
 
-Download from [GitHub Releases](https://github.com/hoveychen/muvee/releases/latest):
+Install `muveectl` from the official prebuilt assets on [GitHub Releases](https://github.com/hoveychen/muvee/releases/latest). Prefer the latest stable release unless the user asks for a specific version. Do not build from source and do not guess ad-hoc download URLs; use the published release assets directly.
 
 ```bash
-# macOS (Apple Silicon)
-curl -Lo muveectl https://github.com/hoveychen/muvee/releases/latest/download/muveectl_darwin_arm64
-chmod +x muveectl && sudo mv muveectl /usr/local/bin/
-
-# macOS (Intel)
-curl -Lo muveectl https://github.com/hoveychen/muvee/releases/latest/download/muveectl_darwin_amd64
-chmod +x muveectl && sudo mv muveectl /usr/local/bin/
-
-# Linux (amd64)
-curl -Lo muveectl https://github.com/hoveychen/muvee/releases/latest/download/muveectl_linux_amd64
-chmod +x muveectl && sudo mv muveectl /usr/local/bin/
+# Choose the matching asset from the latest GitHub Release:
+# macOS (Apple Silicon): muveectl_<VERSION>_darwin_arm64.tar.gz
+# macOS (Intel):         muveectl_<VERSION>_darwin_amd64.tar.gz
+# Linux (amd64):         muveectl_<VERSION>_linux_amd64.tar.gz
+# Linux (arm64):         muveectl_<VERSION>_linux_arm64.tar.gz
+#
+# After extracting, rename the binary to `muveectl` and place it on PATH,
+# for example in /usr/local/bin/muveectl.
 ```
 
 ```powershell
-# Windows (PowerShell)
-Invoke-WebRequest -Uri https://github.com/hoveychen/muvee/releases/latest/download/muveectl_windows_amd64.exe -OutFile muveectl.exe
+# Windows assets on GitHub Releases:
+# muveectl_<VERSION>_windows_amd64.zip
+# muveectl_<VERSION>_windows_arm64.zip
+#
+# Extract the zip and place the executable on PATH as `muveectl.exe`.
 ```
 
 ## Authentication
@@ -77,6 +77,26 @@ userEmail := r.Header.Get("X-Forwarded-User")
 // Node.js / Express
 const userEmail = req.headers["x-forwarded-user"]
 ```
+
+## Local Port Forwarding
+
+Forward a project's running container to a local port for development. Authentication is automatically handled using your CLI identity — the container receives your email in the `X-Forwarded-User` header, just like in production.
+
+```bash
+# Auto-pick a free local port
+muveectl projects port-forward PROJECT_ID
+
+# Use a specific local port
+muveectl projects port-forward PROJECT_ID --port 3000
+```
+
+Then call the project's API locally:
+
+```bash
+curl http://127.0.0.1:3000/api/some-endpoint
+```
+
+This is useful for local development when your code needs to call APIs exposed by a deployed project, without dealing with OAuth login flows or TLS certificates.
 
 ## Datasets
 
@@ -180,3 +200,4 @@ muveectl projects repo PROJECT_ID show main:README.md
 1. Get project IDs: `muveectl projects list --json`
 2. Deploy a project: `muveectl projects deploy PROJECT_ID`
 3. Check status: `muveectl projects deployments PROJECT_ID`
+4. Forward to local port: `muveectl projects port-forward PROJECT_ID --port 3000`
