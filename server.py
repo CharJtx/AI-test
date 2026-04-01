@@ -137,6 +137,45 @@ def _next_id(items: list[dict]) -> int:
     return max((item["id"] for item in items), default=0) + 1
 
 
+def _extract_png_text_chunks(raw: bytes) -> dict[str, bytes]:
+    """手动解析 PNG 文件的 tEXt/iTXt 块，返回 {keyword: value_bytes}。
+
+    PIL 的 img.info 对大型 tEXt 块常常读取失败，因此需要手动解析 PNG chunk 结构。
+    """
+    result = {}
+    if raw[:4] != b'\x89PNG':
+        return result
+    pos = 8  # 跳过 PNG signature
+    while pos + 8 <= len(raw):
+        length = struct.unpack('>I', raw[pos:pos+4])[0]
+        chunk_type = raw[pos+4:pos+8]
+        chunk_data = raw[pos+8:pos+8+length]
+        pos += 12 + length  # 8(header) + length + 4(CRC)
+
+        ct = chunk_type.decode('ascii', errors='replace')
+        if ct == 'tEXt' and b'\x00' in chunk_data:
+            null_idx = chunk_data.index(b'\x00')
+            keyword = chunk_data[:null_idx].decode('ascii', errors='replace')
+            value = chunk_data[null_idx+1:]
+            result[keyword] = value
+        elif ct == 'iTXt' and b'\x00' in chunk_data:
+            null_idx = chunk_data.index(b'\x00')
+            keyword = chunk_data[:null_idx].decode('ascii', errors='replace')
+            # iTXt: keyword\0 + compression_flag(1) + compression_method(1) + lang\0 + translated\0 + text
+            rest = chunk_data[null_idx+1:]
+            if len(rest) > 2:
+                rest = rest[2:]  # skip compression flag + method
+                n1 = rest.index(b'\x00') if b'\x00' in rest else -1
+                if n1 >= 0:
+                    rest = rest[n1+1:]
+                    n2 = rest.index(b'\x00') if b'\x00' in rest else -1
+                    if n2 >= 0:
+                        result[keyword] = rest[n2+1:]
+        elif ct == 'IEND':
+            break
+    return result
+
+
 def _save_avatar(img_bytes: bytes, char_id: int | str, max_size: int = 512) -> str:
     """将图片 bytes 缩放后保存到 AVATARS_DIR，返回 /avatars/xxx.png URL 路径。"""
     img = Image.open(io.BytesIO(img_bytes))
@@ -2670,11 +2709,10 @@ async def import_character(file: UploadFile = File(...)):
     is_png = fname.endswith(".png") or (file.content_type or "").startswith("image/")
 
     if is_png:
-        # PNG 角色卡：从图片元数据中提取角色 JSON
+        # PNG 角色卡：手动解析 tEXt chunks 提取角色 JSON（PIL 对大型 tEXt 读取不可靠）
         try:
-            img = Image.open(io.BytesIO(raw))
-            metadata = img.info or {}
-            chara_b64 = metadata.get("chara") or metadata.get("ccv3")
+            text_chunks = _extract_png_text_chunks(raw)
+            chara_b64 = text_chunks.get("chara") or text_chunks.get("ccv3")
             if not chara_b64:
                 return JSONResponse(
                     {"error": "PNG 中未找到角色卡数据（缺少 chara/ccv3 元数据）"},
