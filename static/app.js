@@ -108,6 +108,7 @@ const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
 const $charTags = document.getElementById("char-tags");
 const $btnRemixChar = document.getElementById("btn-remix-char");
+const $btnExportChar = document.getElementById("btn-export-char");
 const $btnEditChar = document.getElementById("btn-edit-char");
 const $btnDeleteChar = document.getElementById("btn-delete-char");
 const $btnSendGreeting = document.getElementById("btn-send-greeting");
@@ -151,6 +152,10 @@ function setupEvents() {
   $btnEditChar.addEventListener("click", () => {
     const c = getActiveChar();
     if (c) openCharEditor(c);
+  });
+  $btnExportChar?.addEventListener("click", () => {
+    const c = getActiveChar();
+    if (c) openExportDialog(c);
   });
   $btnDeleteChar.addEventListener("click", deleteCharacter);
   $btnSendGreeting.addEventListener("click", sendGreeting);
@@ -1733,6 +1738,40 @@ async function importCharacter() {
   } catch (e) {
     alert("导入失败: " + e.message);
   }
+}
+
+function openExportDialog(char) {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:320px;">
+      <h3>导出角色卡「${escapeHtml(char.name)}」</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0;">
+        <button id="export-json" class="primary" style="padding:10px;">📄 导出为 JSON</button>
+        <button id="export-png" class="primary" style="padding:10px;">🖼️ 导出为 PNG 角色卡</button>
+        <div class="hint" style="text-align:center;">PNG 格式将头像和角色数据打包在一起，兼容 SillyTavern</div>
+      </div>
+      <div class="dialog-actions"><button id="export-cancel">取消</button></div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const download = (url) => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    overlay.remove();
+  };
+
+  document.getElementById("export-json").addEventListener("click", () => {
+    download(`/api/characters/${char.id}/export?format=json`);
+  });
+  document.getElementById("export-png").addEventListener("click", () => {
+    download(`/api/characters/${char.id}/export?format=png`);
+  });
+  document.getElementById("export-cancel").addEventListener("click", () => overlay.remove());
 }
 
 async function deleteCharacter() {

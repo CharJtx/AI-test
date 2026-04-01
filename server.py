@@ -2695,6 +2695,107 @@ async def remove_character_avatar(char_id: int):
     return {"ok": True}
 
 
+def _build_png_with_chara(img_bytes: bytes, chara_json: str) -> bytes:
+    """将角色卡 JSON 数据以 tEXt chunk 嵌入 PNG 图片，生成 Tavern 格式角色卡。"""
+    chara_b64 = base64.b64encode(chara_json.encode("utf-8"))
+    # 构造 tEXt chunk: keyword("chara") + \x00 + base64 data
+    chunk_data = b"chara\x00" + chara_b64
+    # tEXt chunk = length(4) + "tEXt"(4) + data + CRC(4)
+    import zlib
+    chunk_crc = zlib.crc32(b"tEXt" + chunk_data) & 0xFFFFFFFF
+    text_chunk = struct.pack('>I', len(chunk_data)) + b"tEXt" + chunk_data + struct.pack('>I', chunk_crc)
+
+    # 在 IEND 之前插入 tEXt chunk
+    iend_pos = img_bytes.rfind(b'IEND')
+    if iend_pos < 0:
+        raise ValueError("Invalid PNG: IEND not found")
+    iend_start = iend_pos - 4  # length field before IEND
+    return img_bytes[:iend_start] + text_chunk + img_bytes[iend_start:]
+
+
+@app.get("/api/characters/{char_id}/export")
+async def export_character(char_id: int, format: str = Query("json")):
+    """导出角色卡为 JSON 或 PNG (Tavern V2) 格式。"""
+    chars = load_characters()
+    char = next((c for c in chars if c["id"] == char_id), None)
+    if not char:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    # 构建 TavernAI V2 标准结构
+    export_data = {
+        "spec": "chara_card_v2",
+        "spec_version": "2.0",
+        "data": {
+            "name": char.get("name", ""),
+            "description": char.get("description", ""),
+            "personality": char.get("personality", ""),
+            "scenario": char.get("scenario", ""),
+            "first_mes": char.get("first_mes", ""),
+            "mes_example": char.get("mes_example", ""),
+            "system_prompt": char.get("system_prompt", ""),
+            "creator_notes": char.get("creator_notes", ""),
+            "tags": char.get("tags", []),
+            "creator": "",
+            "character_version": "",
+            "alternate_greetings": [],
+            "post_history_instructions": "",
+            "extensions": {},
+            "character_book": char.get("character_book", {}),
+        },
+    }
+    # 顶层也放一份（兼容 V1 读取器）
+    for k in ["name", "description", "personality", "scenario", "first_mes", "mes_example"]:
+        export_data[k] = export_data["data"][k]
+
+    safe_name = re.sub(r'[^\w\-]', '_', char.get("name", "character"))
+
+    if format == "png":
+        # 获取头像图片作为 PNG 底图
+        avatar_url = char.get("avatar", "")
+        img_bytes = None
+        if avatar_url and char.get("avatar_type") == "image":
+            if avatar_url.startswith("/avatars/"):
+                avatar_path = AVATARS_DIR / avatar_url.split("/avatars/")[-1]
+                if avatar_path.exists():
+                    img_bytes = avatar_path.read_bytes()
+            elif avatar_url.startswith("data:"):
+                # base64 data URL (旧格式兼容)
+                try:
+                    img_bytes = base64.b64decode(avatar_url.split(",", 1)[1])
+                except Exception:
+                    pass
+
+        if not img_bytes:
+            # 无头像时生成一张 512x512 灰色占位图
+            placeholder = Image.new("RGB", (512, 512), (64, 64, 64))
+            buf = io.BytesIO()
+            placeholder.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+
+        # 确保是 PNG 格式
+        if img_bytes[:4] != b'\x89PNG':
+            img = Image.open(io.BytesIO(img_bytes))
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
+
+        chara_json = json.dumps(export_data, ensure_ascii=False)
+        png_bytes = _build_png_with_chara(img_bytes, chara_json)
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.png"'},
+        )
+    else:
+        # JSON 导出
+        json_str = json.dumps(export_data, ensure_ascii=False, indent=2)
+        return Response(
+            content=json_str.encode("utf-8"),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+        )
+
+
 @app.post("/api/characters/import")
 async def import_character(file: UploadFile = File(...)):
     """Import a character card from JSON or PNG (Tavern/SillyTavern format).
