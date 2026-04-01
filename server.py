@@ -2751,7 +2751,9 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
     for k in ["name", "description", "personality", "scenario", "first_mes", "mes_example"]:
         export_data[k] = export_data["data"][k]
 
-    safe_name = re.sub(r'[^\w\-]', '_', char.get("name", "character"))
+    from urllib.parse import quote
+    raw_name = char.get("name", "character") or "character"
+    safe_name = quote(raw_name, safe="")
 
     if fmt == "png":
         # 获取头像图片作为 PNG 底图
@@ -2788,7 +2790,7 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
         return Response(
             content=png_bytes,
             media_type="image/png",
-            headers={"Content-Disposition": f'attachment; filename="{safe_name}.png"'},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}.png"},
         )
     else:
         # JSON 导出
@@ -2796,7 +2798,7 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
         return Response(
             content=json_str.encode("utf-8"),
             media_type="application/json",
-            headers={"Content-Disposition": f'attachment; filename="{safe_name}.json"'},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}.json"},
         )
 
 
