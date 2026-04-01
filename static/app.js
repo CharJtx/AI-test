@@ -2102,12 +2102,29 @@ function openCharEditor(existingChar) {
     ? JSON.parse(JSON.stringify(existingChar))
     : { name: "", description: "", personality: "", scenario: "", first_mes: "", mes_example: "", system_prompt: "", creator_notes: "", tags: [] };
 
+  let avatarChanged = false;
+  let avatarUrl = (char.avatar_type === "image" && char.avatar) ? char.avatar : "";
+
   const overlay = document.createElement("div");
   overlay.className = "dialog-overlay";
   overlay.innerHTML = `
     <div class="dialog char-editor">
       <h3>${isNew ? "新建角色卡" : "编辑角色卡"}</h3>
       <div class="char-editor-fields">
+        <div class="char-field">
+          <label>头像 Avatar</label>
+          <div id="ce-avatar-preview">
+            ${avatarUrl
+              ? `<img src="${avatarUrl}" alt="avatar">`
+              : `<div class="ce-avatar-placeholder">暂无头像</div>`}
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button type="button" id="ce-avatar-upload-btn" class="small-btn">上传图片</button>
+            <button type="button" id="ce-avatar-remove-btn" class="small-btn">移除头像</button>
+          </div>
+          <input type="file" id="ce-avatar-input" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+          <div class="hint">支持 PNG, JPEG, GIF, WebP</div>
+        </div>
         <div class="char-field">
           <label>角色名 Name</label>
           <input type="text" id="ce-name" value="${escapeHtml(char.name)}" placeholder="角色的名字">
@@ -2158,6 +2175,32 @@ function openCharEditor(existingChar) {
     </div>`;
   document.body.appendChild(overlay);
 
+  // ── 头像上传逻辑 ──
+  const ceAvatarInput = document.getElementById("ce-avatar-input");
+  const ceAvatarPreview = document.getElementById("ce-avatar-preview");
+  let pendingAvatarFile = null;
+
+  document.getElementById("ce-avatar-upload-btn").addEventListener("click", () => ceAvatarInput.click());
+  ceAvatarInput.addEventListener("change", () => {
+    const f = ceAvatarInput.files[0];
+    if (!f) return;
+    pendingAvatarFile = f;
+    avatarChanged = true;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      avatarUrl = e.target.result;
+      ceAvatarPreview.innerHTML = `<img src="${avatarUrl}" alt="avatar">`;
+    };
+    reader.readAsDataURL(f);
+    ceAvatarInput.value = "";
+  });
+  document.getElementById("ce-avatar-remove-btn").addEventListener("click", () => {
+    avatarUrl = "";
+    avatarChanged = true;
+    pendingAvatarFile = null;
+    ceAvatarPreview.innerHTML = `<div class="ce-avatar-placeholder">暂无头像</div>`;
+  });
+
   document.getElementById("ce-cancel").addEventListener("click", () => overlay.remove());
   document.getElementById("ce-save").addEventListener("click", async () => {
     char.name = document.getElementById("ce-name").value.trim() || "未命名角色";
@@ -2170,6 +2213,12 @@ function openCharEditor(existingChar) {
     char.creator_notes = document.getElementById("ce-creator-notes").value;
     char.tags = document.getElementById("ce-tags").value.split(",").map((t) => t.trim()).filter(Boolean);
 
+    // 处理头像移除（无文件上传的情况）
+    if (avatarChanged && !pendingAvatarFile) {
+      char.avatar = "";
+      char.avatar_type = "";
+    }
+
     overlay.remove();
 
     if (isNew) {
@@ -2181,7 +2230,31 @@ function openCharEditor(existingChar) {
       const data = await resp.json();
       state.characters.push(data.character);
       state.activeCharId = data.character.id;
+
+      // 新建角色后如有头像文件，上传到服务端
+      if (pendingAvatarFile && data.character.id) {
+        const fd = new FormData();
+        fd.append("file", pendingAvatarFile);
+        const avResp = await fetch(`/api/characters/${data.character.id}/avatar`, { method: "POST", body: fd });
+        const avData = await avResp.json();
+        if (avData.avatar) {
+          data.character.avatar = avData.avatar;
+          data.character.avatar_type = avData.avatar_type;
+        }
+      }
     } else {
+      // 编辑模式：先上传头像，再保存角色
+      if (pendingAvatarFile) {
+        const fd = new FormData();
+        fd.append("file", pendingAvatarFile);
+        const avResp = await fetch(`/api/characters/${char.id}/avatar`, { method: "POST", body: fd });
+        const avData = await avResp.json();
+        if (avData.avatar) {
+          char.avatar = avData.avatar;
+          char.avatar_type = avData.avatar_type;
+        }
+      }
+
       await fetch(`/api/characters/${char.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

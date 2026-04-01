@@ -62,8 +62,10 @@ app.add_middleware(NoCacheStaticMiddleware)
 # 可通过环境变量覆盖持久化目录，便于容器部署时挂载数据卷。
 DATA_DIR = Path(os.getenv("APP_DATA_DIR", "data"))
 SCENES_DIR = Path(os.getenv("APP_SCENES_DIR", "playground/scenes"))
+AVATARS_DIR = Path(os.getenv("APP_AVATARS_DIR", "/appdata/avatars"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 SCENES_DIR.mkdir(parents=True, exist_ok=True)
+AVATARS_DIR.mkdir(parents=True, exist_ok=True)
 PRESETS_FILE = DATA_DIR / "presets.json"       # 推理参数预设
 WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
 CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
@@ -135,6 +137,23 @@ def _next_id(items: list[dict]) -> int:
     return max((item["id"] for item in items), default=0) + 1
 
 
+def _save_avatar(img_bytes: bytes, char_id: int | str, max_size: int = 512) -> str:
+    """将图片 bytes 缩放后保存到 AVATARS_DIR，返回 /avatars/xxx.png URL 路径。"""
+    img = Image.open(io.BytesIO(img_bytes))
+    img.thumbnail((max_size, max_size))
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGBA")
+    else:
+        img = img.convert("RGB")
+    ts = int(datetime.now(timezone.utc).timestamp())
+    fname = f"{char_id}_{ts}.png"
+    out_path = AVATARS_DIR / fname
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    out_path.write_bytes(buf.getvalue())
+    return f"/avatars/{fname}"
+
+
 # 角色卡标准字段列表，用于从各种格式中提取统一结构
 CHAR_FIELDS = [
     "name", "description", "personality", "scenario",
@@ -171,6 +190,10 @@ def _normalize_char(data: dict) -> dict:
         char["first_mes"] = src["char_greeting"]
     if not char["name"]:
         char["name"] = src.get("char_name", "")
+
+    # 保留 character_book（世界书/角色书）数据
+    if src.get("character_book"):
+        char["character_book"] = src["character_book"]
 
     return char
 
@@ -2599,28 +2622,103 @@ async def delete_character(char_id: int):
     return {"ok": True}
 
 
+@app.post("/api/characters/{char_id}/avatar")
+async def upload_character_avatar(char_id: int, file: UploadFile = File(...)):
+    """上传或替换角色头像图片，保存到持久化目录。"""
+    chars = load_characters()
+    char = next((c for c in chars if c["id"] == char_id), None)
+    if not char:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    img_bytes = await file.read()
+    try:
+        avatar_url = _save_avatar(img_bytes, char_id)
+    except Exception as e:
+        return JSONResponse({"error": f"图片处理失败: {e}"}, status_code=400)
+
+    char["avatar"] = avatar_url
+    char["avatar_type"] = "image"
+    save_characters(chars)
+    return {"avatar": avatar_url, "avatar_type": "image"}
+
+
+@app.delete("/api/characters/{char_id}/avatar")
+async def remove_character_avatar(char_id: int):
+    """移除角色头像。"""
+    chars = load_characters()
+    char = next((c for c in chars if c["id"] == char_id), None)
+    if not char:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    char["avatar"] = ""
+    char["avatar_type"] = ""
+    save_characters(chars)
+    return {"ok": True}
+
+
 @app.post("/api/characters/import")
 async def import_character(file: UploadFile = File(...)):
-    """Import a character card from JSON. Supports native, TavernAI V2, and SillyTavern formats.
+    """Import a character card from JSON or PNG (Tavern/SillyTavern format).
 
-    从 JSON 文件导入角色卡，通过 _normalize_char 统一不同格式。
-    如果导入的数据中没有角色名称，则使用文件名作为默认名。
+    支持两种格式：
+    - JSON 文件：直接解析角色卡数据
+    - PNG 文件：从 tEXt 元数据中提取 "chara"(V2) 或 "ccv3"(V3) 角色数据，
+      图片自动保存为头像
     """
-    try:
-        raw = await file.read()
-        data = json.loads(raw.decode("utf-8"))
-    except Exception:
-        return JSONResponse({"error": "Invalid JSON file"}, status_code=400)
+    raw = await file.read()
+    fname = (file.filename or "").lower()
+    is_png = fname.endswith(".png") or (file.content_type or "").startswith("image/")
 
-    chars = load_characters()
-    char = _normalize_char(data)
-    char["id"] = _next_id(chars)
-    if not char["name"]:
-        char["name"] = (file.filename or "Imported").rsplit(".", 1)[0]
+    if is_png:
+        # PNG 角色卡：从图片元数据中提取角色 JSON
+        try:
+            img = Image.open(io.BytesIO(raw))
+            metadata = img.info or {}
+            chara_b64 = metadata.get("chara") or metadata.get("ccv3")
+            if not chara_b64:
+                return JSONResponse(
+                    {"error": "PNG 中未找到角色卡数据（缺少 chara/ccv3 元数据）"},
+                    status_code=400,
+                )
+            data = json.loads(base64.b64decode(chara_b64))
+        except json.JSONDecodeError:
+            return JSONResponse({"error": "PNG 元数据中的角色数据不是有效 JSON"}, status_code=400)
+        except Exception as e:
+            return JSONResponse({"error": f"无法解析 PNG 文件: {e}"}, status_code=400)
 
-    chars.append(char)
-    save_characters(chars)
-    return {"character": char}
+        chars = load_characters()
+        char = _normalize_char(data)
+        char["id"] = _next_id(chars)
+        if not char["name"]:
+            char["name"] = fname.rsplit(".", 1)[0] if fname else "Imported"
+
+        # 将 PNG 图片保存为头像文件
+        try:
+            avatar_url = _save_avatar(raw, char["id"])
+            char["avatar"] = avatar_url
+            char["avatar_type"] = "image"
+        except Exception:
+            pass  # 头像保存失败不影响角色导入
+
+        chars.append(char)
+        save_characters(chars)
+        return {"character": char}
+    else:
+        # JSON 角色卡
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON file"}, status_code=400)
+
+        chars = load_characters()
+        char = _normalize_char(data)
+        char["id"] = _next_id(chars)
+        if not char["name"]:
+            char["name"] = (file.filename or "Imported").rsplit(".", 1)[0]
+
+        chars.append(char)
+        save_characters(chars)
+        return {"character": char}
 
 
 # ── Playground 场景管理 ────────────────────────────────────
@@ -3099,6 +3197,7 @@ async def healthz():
 # ── 静态文件托管 ────────────────────────────────────────────
 # 挂载顺序重要：更具体的路径在前，/ 在最后
 # /scenes-data 指向 SCENES_DIR（可能是外部持久卷），支持 Range 请求和视频拖拽
+app.mount("/avatars", StaticFiles(directory=str(AVATARS_DIR)), name="avatars")
 app.mount("/scenes-data", StaticFiles(directory=str(SCENES_DIR)), name="scene-data-files")
 app.mount("/playground", StaticFiles(directory="playground", html=True), name="playground")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

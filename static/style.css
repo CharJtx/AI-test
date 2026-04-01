@@ -1033,3 +1033,20 @@ header h1 {
   word-break: break-word; max-height: 150px; overflow-y: auto;
   user-select: all;
 }
+
+/* 编辑器头像上传区域 */
+#ce-avatar-preview img {
+  max-width: 128px; max-height: 128px; border-radius: 8px;
+  object-fit: cover; display: block;
+}
+.ce-avatar-placeholder {
+  width: 128px; height: 128px; border: 2px dashed var(--border);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 11px;
+}
+.small-btn {
+  padding: 3px 10px; font-size: 11px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface); color: var(--text);
+  cursor: pointer;
+}
+.small-btn:hover { background: var(--surface2); }
