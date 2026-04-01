@@ -635,12 +635,16 @@ async def generate_character_from_image(
             status_code=422,
         )
 
-    # 图片生成模式下，头像直接存储用户上传的原图
-    char_data["avatar"] = data_url
-    char_data["avatar_type"] = "image"
-
+    # 图片生成模式下，将上传的原图保存到 avatars 目录
     chars = load_characters()
     char_data["id"] = _next_id(chars)
+    try:
+        avatar_url = _save_avatar(img_bytes, char_data["id"])
+        char_data["avatar"] = avatar_url
+        char_data["avatar_type"] = "image"
+    except Exception:
+        pass  # 头像保存失败不影响角色创建
+
     chars.append(char_data)
     save_characters(chars)
     return {"character": char_data}
@@ -2714,7 +2718,7 @@ def _build_png_with_chara(img_bytes: bytes, chara_json: str) -> bytes:
 
 
 @app.get("/api/characters/{char_id}/export")
-async def export_character(char_id: int, format: str = Query("json")):
+async def export_character(char_id: int, fmt: str = Query("json", alias="format")):
     """导出角色卡为 JSON 或 PNG (Tavern V2) 格式。"""
     chars = load_characters()
     char = next((c for c in chars if c["id"] == char_id), None)
@@ -2749,7 +2753,7 @@ async def export_character(char_id: int, format: str = Query("json")):
 
     safe_name = re.sub(r'[^\w\-]', '_', char.get("name", "character"))
 
-    if format == "png":
+    if fmt == "png":
         # 获取头像图片作为 PNG 底图
         avatar_url = char.get("avatar", "")
         img_bytes = None
