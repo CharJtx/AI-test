@@ -2536,6 +2536,27 @@ async def import_worldbook(file: UploadFile = File(...)):
     return {"worldbook": book}
 
 
+# ── 数据批量恢复接口（临时，用完后可删除） ───────────────────
+@app.put("/api/admin/restore")
+async def admin_restore(request: Request):
+    """批量恢复数据：接受 JSON body 包含 characters/chats/presets/worldbooks/kol_characters/gen_options 字段。"""
+    body = await request.json()
+    restored = []
+    if "characters" in body:
+        save_characters(body["characters"]); restored.append(f"characters({len(body['characters'])})")
+    if "chats" in body:
+        _save_json(CHATS_FILE, body["chats"]); restored.append(f"chats({len(body['chats'])})")
+    if "presets" in body:
+        save_presets(body["presets"]); restored.append(f"presets({len(body['presets'])})")
+    if "worldbooks" in body:
+        save_worldbooks(body["worldbooks"]); restored.append(f"worldbooks({len(body['worldbooks'])})")
+    if "kol_characters" in body:
+        _save_json(KOL_CHARS_FILE, body["kol_characters"]); restored.append(f"kol_characters({len(body['kol_characters'])})")
+    if "gen_options" in body:
+        _save_json(GEN_OPTIONS_FILE, body["gen_options"]); restored.append(f"gen_options({len(body['gen_options'])})")
+    return {"ok": True, "restored": restored}
+
+
 # ── 角色卡（Characters）CRUD ────────────────────────────────
 
 @app.get("/api/characters")
