@@ -1713,31 +1713,49 @@ function sendGreeting() {
 }
 
 /**
- * 导入角色卡文件（JSON/PNG 格式），上传到后端解析后加入角色列表。
+ * 导入角色卡文件（JSON/PNG 格式），支持单个或批量上传。
  */
 async function importCharacter() {
-  const file = $charFileInput.files[0];
-  if (!file) return;
+  const files = Array.from($charFileInput.files);
+  if (!files.length) return;
   $charFileInput.value = "";
 
-  const formData = new FormData();
-  formData.append("file", file);
-
-  try {
-    const resp = await fetch("/api/characters/import", { method: "POST", body: formData });
-    const data = await resp.json();
-    if (data.error) {
-      alert("导入失败: " + data.error);
-      return;
-    }
-    state.characters.push(data.character);
-    renderCharSelect();
-    state.activeCharId = data.character.id;
-    $charSelect.value = data.character.id;
-    renderCharInfo();
-  } catch (e) {
-    alert("导入失败: " + e.message);
+  if (files.length === 1) {
+    // 单文件走原有接口
+    const formData = new FormData();
+    formData.append("file", files[0]);
+    try {
+      const resp = await fetch("/api/characters/import", { method: "POST", body: formData });
+      const data = await resp.json();
+      if (data.error) { alert("导入失败: " + data.error); return; }
+      state.characters.push(data.character);
+      state.activeCharId = data.character.id;
+    } catch (e) { alert("导入失败: " + e.message); return; }
+  } else {
+    // 多文件走批量接口
+    const formData = new FormData();
+    files.forEach((f) => formData.append("files", f));
+    try {
+      const resp = await fetch("/api/characters/import-batch", { method: "POST", body: formData });
+      const data = await resp.json();
+      const msg = `导入完成：成功 ${data.success_count}/${data.total}`;
+      if (data.errors.length) {
+        alert(msg + "\n\n失败详情：\n" + data.errors.join("\n"));
+      } else {
+        alert(msg);
+      }
+      // 重新加载角色列表
+      const listResp = await fetch("/api/characters");
+      const listData = await listResp.json();
+      state.characters = listData.characters || [];
+      if (data.imported.length) {
+        state.activeCharId = data.imported[data.imported.length - 1].id;
+      }
+    } catch (e) { alert("批量导入失败: " + e.message); return; }
   }
+  renderCharSelect();
+  $charSelect.value = state.activeCharId;
+  renderCharInfo();
 }
 
 function openExportDialog(char) {

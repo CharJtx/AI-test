@@ -2802,68 +2802,87 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
         )
 
 
-@app.post("/api/characters/import")
-async def import_character(file: UploadFile = File(...)):
-    """Import a character card from JSON or PNG (Tavern/SillyTavern format).
-
-    支持两种格式：
-    - JSON 文件：直接解析角色卡数据
-    - PNG 文件：从 tEXt 元数据中提取 "chara"(V2) 或 "ccv3"(V3) 角色数据，
-      图片自动保存为头像
-    """
-    raw = await file.read()
-    fname = (file.filename or "").lower()
-    is_png = fname.endswith(".png") or (file.content_type or "").startswith("image/")
+def _import_single_file(raw: bytes, fname: str, chars: list[dict]) -> dict | str:
+    """导入单个角色卡文件，返回角色 dict 或错误字符串。不保存到磁盘，由调用方统一保存。"""
+    is_png = fname.endswith(".png") or fname.endswith(".jpg") or fname.endswith(".jpeg") or fname.endswith(".webp")
 
     if is_png:
-        # PNG 角色卡：手动解析 tEXt chunks 提取角色 JSON（PIL 对大型 tEXt 读取不可靠）
         try:
             text_chunks = _extract_png_text_chunks(raw)
             chara_b64 = text_chunks.get("chara") or text_chunks.get("ccv3")
             if not chara_b64:
-                return JSONResponse(
-                    {"error": "PNG 中未找到角色卡数据（缺少 chara/ccv3 元数据）"},
-                    status_code=400,
-                )
+                return f"{fname}: PNG 中未找到角色卡数据（缺少 chara/ccv3 元数据）"
             data = json.loads(base64.b64decode(chara_b64))
         except json.JSONDecodeError:
-            return JSONResponse({"error": "PNG 元数据中的角色数据不是有效 JSON"}, status_code=400)
+            return f"{fname}: PNG 元数据中的角色数据不是有效 JSON"
         except Exception as e:
-            return JSONResponse({"error": f"无法解析 PNG 文件: {e}"}, status_code=400)
+            return f"{fname}: 无法解析 PNG 文件: {e}"
 
-        chars = load_characters()
         char = _normalize_char(data)
         char["id"] = _next_id(chars)
         if not char["name"]:
             char["name"] = fname.rsplit(".", 1)[0] if fname else "Imported"
-
-        # 将 PNG 图片保存为头像文件
         try:
             avatar_url = _save_avatar(raw, char["id"])
             char["avatar"] = avatar_url
             char["avatar_type"] = "image"
         except Exception:
-            pass  # 头像保存失败不影响角色导入
-
-        chars.append(char)
-        save_characters(chars)
-        return {"character": char}
+            pass
+        return char
     else:
-        # JSON 角色卡
         try:
             data = json.loads(raw.decode("utf-8"))
         except Exception:
-            return JSONResponse({"error": "Invalid JSON file"}, status_code=400)
+            return f"{fname}: 不是有效的 JSON 文件"
 
-        chars = load_characters()
         char = _normalize_char(data)
         char["id"] = _next_id(chars)
         if not char["name"]:
-            char["name"] = (file.filename or "Imported").rsplit(".", 1)[0]
+            char["name"] = fname.rsplit(".", 1)[0] if fname else "Imported"
+        return char
 
-        chars.append(char)
+
+@app.post("/api/characters/import")
+async def import_character(file: UploadFile = File(...)):
+    """导入单个角色卡（JSON/PNG），兼容旧接口。"""
+    raw = await file.read()
+    fname = (file.filename or "").lower()
+    chars = load_characters()
+    result = _import_single_file(raw, fname, chars)
+    if isinstance(result, str):
+        return JSONResponse({"error": result}, status_code=400)
+    chars.append(result)
+    save_characters(chars)
+    return {"character": result}
+
+
+@app.post("/api/characters/import-batch")
+async def import_characters_batch(files: list[UploadFile] = File(...)):
+    """批量导入角色卡（JSON/PNG），返回成功和失败的详情。"""
+    chars = load_characters()
+    imported = []
+    errors = []
+
+    for f in files:
+        raw = await f.read()
+        fname = (f.filename or "").lower()
+        result = _import_single_file(raw, fname, chars)
+        if isinstance(result, str):
+            errors.append(result)
+        else:
+            chars.append(result)
+            imported.append({"id": result["id"], "name": result.get("name", "")})
+
+    if imported:
         save_characters(chars)
-        return {"character": char}
+
+    return {
+        "imported": imported,
+        "errors": errors,
+        "total": len(files),
+        "success_count": len(imported),
+        "error_count": len(errors),
+    }
 
 
 # ── Playground 场景管理 ────────────────────────────────────
