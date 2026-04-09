@@ -797,6 +797,57 @@ async def remix_character(request: Request):
     return {"character": char_data}
 
 
+# ── 角色简介生成 ──────────────────────────────────────────
+
+TAGLINE_SYSTEM = """You are a creative copywriter for character cards.
+Given a character's name, description, personality, and scenario, write exactly 2 short, catchy sentences that:
+1. Capture the character's core appeal and unique charm
+2. Make readers curious and want to interact with this character
+3. Are flirty or suggestive at most — NEVER explicit, vulgar, or violent
+4. Match the language of the input (Chinese input → Chinese output, English → English)
+
+Return ONLY the 2 sentences, nothing else. No quotes, no labels, no explanation."""
+
+
+async def _generate_tagline(name: str, description: str, personality: str, scenario: str) -> str:
+    """用 LLM 生成两句话的角色简介。"""
+    text = f"角色名: {name}\n"
+    if description:
+        text += f"描述: {description[:800]}\n"
+    if personality:
+        text += f"性格: {personality[:200]}\n"
+    if scenario:
+        text += f"场景: {scenario[:200]}\n"
+
+    if not description and not personality:
+        return ""
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{OPENROUTER_BASE}/chat/completions",
+                json={
+                    "model": "x-ai/grok-4.1-fast",
+                    "messages": [
+                        {"role": "system", "content": TAGLINE_SYSTEM},
+                        {"role": "user", "content": text},
+                    ],
+                    "temperature": 0.8,
+                    "max_tokens": 200,
+                },
+                headers={
+                    "Authorization": f"Bearer {get_api_key()}",
+                    "Content-Type": "application/json",
+                },
+            )
+        if resp.status_code == 200:
+            content = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content.strip()
+    except Exception:
+        pass
+    return ""
+
+
 # ── 头像提示词辅助功能 ─────────────────────────────────────
 
 # 头像生成系统提示词：将角色文字描述转换为适用于 Stable Diffusion / DALL-E
@@ -2788,6 +2839,23 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
             "character_book": _normalize_book_entries(char.get("character_book")),
         },
     }
+    # 用 LLM 生成两句话的角色简介（如果还没有缓存过）
+    tagline = char.get("tagline", "")
+    if not tagline:
+        tagline = await _generate_tagline(
+            char.get("name", ""),
+            char.get("description", ""),
+            char.get("personality", ""),
+            char.get("scenario", ""),
+        )
+        if tagline:
+            # 缓存到角色数据中，避免重复调用
+            char["tagline"] = tagline
+            save_characters(chars)
+
+    export_data["data"]["tagline"] = tagline
+    export_data["tagline"] = tagline
+
     # 顶层也放一份（兼容 V1 读取器）
     for k in ["name", "description", "personality", "scenario", "first_mes", "mes_example"]:
         export_data[k] = export_data["data"][k]
