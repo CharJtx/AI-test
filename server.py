@@ -194,16 +194,44 @@ def _save_avatar(img_bytes: bytes, char_id: int | str, max_size: int = 512) -> s
 
 
 def _normalize_book_entries(book) -> list:
-    """统一 character_book 格式为 entries 数组。
-    兼容两种存储格式：list（直接就是 entries）或 dict（Tavern V2 的 {entries: [...]} 结构）。
+    """统一 character_book 格式为标准化的 entries 数组。
+
+    兼容多种存储格式，并将每个 entry 标准化为统一结构：
+    {name, keys, secondary_keys, content, enabled, insertion_order,
+     case_sensitive, priority, id, comment, selective, constant,
+     position, extensions, probability, selectiveLogic}
     """
     if not book:
         return []
-    if isinstance(book, list):
-        return book
-    if isinstance(book, dict):
-        return book.get("entries", [])
-    return []
+    raw = book if isinstance(book, list) else book.get("entries", []) if isinstance(book, dict) else []
+
+    entries = []
+    for i, e in enumerate(raw):
+        if not isinstance(e, dict):
+            continue
+        # 兼容 AI 生成的 keywords 字段 → keys
+        keys = e.get("keys") or e.get("keywords") or []
+        if isinstance(keys, str):
+            keys = [k.strip() for k in keys.split(",") if k.strip()]
+        entries.append({
+            "name": e.get("name") or e.get("entry") or f"Entry {i+1}",
+            "keys": keys,
+            "secondary_keys": e.get("secondary_keys", []),
+            "content": e.get("content", ""),
+            "enabled": e.get("enabled", True),
+            "insertion_order": e.get("insertion_order", 10),
+            "case_sensitive": e.get("case_sensitive", False),
+            "priority": e.get("priority", 10),
+            "id": e.get("id", i + 1),
+            "comment": e.get("comment", ""),
+            "selective": e.get("selective", False),
+            "constant": e.get("constant", False),
+            "position": e.get("position", ""),
+            "extensions": e.get("extensions", {"depth": 4, "linked": False, "weight": 10}),
+            "probability": e.get("probability", 100),
+            "selectiveLogic": e.get("selectiveLogic", 0),
+        })
+    return entries
 
 
 # 角色卡标准字段列表，用于从各种格式中提取统一结构
