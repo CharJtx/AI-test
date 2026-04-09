@@ -193,6 +193,19 @@ def _save_avatar(img_bytes: bytes, char_id: int | str, max_size: int = 512) -> s
     return f"/avatars/{fname}"
 
 
+def _normalize_book_entries(book) -> list:
+    """统一 character_book 格式为 entries 数组。
+    兼容两种存储格式：list（直接就是 entries）或 dict（Tavern V2 的 {entries: [...]} 结构）。
+    """
+    if not book:
+        return []
+    if isinstance(book, list):
+        return book
+    if isinstance(book, dict):
+        return book.get("entries", [])
+    return []
+
+
 # 角色卡标准字段列表，用于从各种格式中提取统一结构
 CHAR_FIELDS = [
     "name", "description", "personality", "scenario",
@@ -2744,7 +2757,7 @@ async def export_character(char_id: int, fmt: str = Query("json", alias="format"
             "alternate_greetings": [],
             "post_history_instructions": "",
             "extensions": {},
-            "character_book": char.get("character_book", {}),
+            "character_book": _normalize_book_entries(char.get("character_book")),
         },
     }
     # 顶层也放一份（兼容 V1 读取器）
