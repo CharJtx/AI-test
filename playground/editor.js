@@ -204,7 +204,7 @@ function addState() {
   let idx = stateOrder.length + 1;
   while (sceneData.states[base + idx]) idx++;
   const id = base + idx;
-  sceneData.states[id] = { video: '', loop: true, next: null, on_click: [] };
+  sceneData.states[id] = { video: '', loop: true, next: null, sounds: [], on_click: [] };
   stateOrder.push(id);
   if (!sceneData.initialState) sceneData.initialState = id;
   markDirty();
@@ -274,6 +274,19 @@ function renderStates() {
             <option value="">-- 选择 --</option>
             ${resourceOptions(s.video)}
           </select>
+        </div>
+        <div class="state-field">
+          <label>声音资源</label>
+          <div class="sounds-list" id="sounds-${esc(id)}">
+            ${(s.sounds || []).map((snd, si) => `<div class="sound-item">
+              <select onchange="updateSound('${esc(id)}',${si},this.value)">
+                <option value="">-- 选择 --</option>
+                ${resourceOptions(snd)}
+              </select>
+              <button class="btn danger small" onclick="removeSound('${esc(id)}',${si})">×</button>
+            </div>`).join('')}
+          </div>
+          <button class="btn small" onclick="addSound('${esc(id)}')">+ 添加声音</button>
         </div>
         <div class="state-field">
           <div class="toggle-row">
@@ -514,6 +527,25 @@ function updState(id, field, value) {
   if (field === 'loop' && value) sceneData.states[id].next = null;
   markDirty();
   renderStates();
+}
+
+function addSound(stateId) {
+  const s = sceneData.states[stateId];
+  if (!s.sounds) s.sounds = [];
+  s.sounds.push('');
+  markDirty();
+  renderStates();
+}
+
+function removeSound(stateId, idx) {
+  sceneData.states[stateId].sounds.splice(idx, 1);
+  markDirty();
+  renderStates();
+}
+
+function updateSound(stateId, idx, value) {
+  sceneData.states[stateId].sounds[idx] = value;
+  markDirty();
 }
 
 function handleRename(input, oldId) {

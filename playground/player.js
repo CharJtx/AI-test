@@ -21,6 +21,7 @@ class InteractivePlayer {
     this.debugInfo = null;
     this.startOverlay = null;
     this.pulseDots = [];
+    this.activeSounds = [];
   }
 
   async init() {
@@ -192,6 +193,8 @@ class InteractivePlayer {
     this.currentVideo = video;
     this.currentStateId = stateId;
 
+    this._playSounds(state);
+
     if (!state.loop && state.next) {
       video.onended = () => {
         video.onended = null;
@@ -262,6 +265,31 @@ class InteractivePlayer {
       left: ox + 'px', top: oy + 'px',
       width: dw + 'px', height: dh + 'px',
     });
+  }
+
+  // ── Sound Playback ────────────────────────────────────────
+
+  _stopSounds() {
+    for (const audio of this.activeSounds) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+    this.activeSounds = [];
+  }
+
+  _playSounds(state) {
+    this._stopSounds();
+    if (!state.sounds || !state.sounds.length) return;
+
+    for (const resId of state.sounds) {
+      if (!resId) continue;
+      const filename = this.config.resources[resId];
+      if (!filename) continue;
+      const audio = new Audio(this.baseUrl + encodeURIComponent(filename));
+      audio.loop = !!state.loop;
+      audio.play().catch(() => {});
+      this.activeSounds.push(audio);
+    }
   }
 
   // ── Pulse Points ──────────────────────────────────────────
