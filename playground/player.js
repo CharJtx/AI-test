@@ -20,6 +20,7 @@ class InteractivePlayer {
     this.loadingOverlay = null;
     this.debugInfo = null;
     this.startOverlay = null;
+    this.pulseDots = [];
   }
 
   async init() {
@@ -116,7 +117,7 @@ class InteractivePlayer {
         this._highlightGrid();
       }
     });
-    window.addEventListener('resize', () => this._syncGridPosition());
+    window.addEventListener('resize', () => { this._syncGridPosition(); this._renderPulsePoints(); });
   }
 
   // ── Preloading ────────────────────────────────────────────
@@ -199,6 +200,7 @@ class InteractivePlayer {
     }
 
     this._syncGridPosition();
+    this._renderPulsePoints();
     this._highlightGrid();
     this._updateDebug();
   }
@@ -260,6 +262,37 @@ class InteractivePlayer {
       left: ox + 'px', top: oy + 'px',
       width: dw + 'px', height: dh + 'px',
     });
+  }
+
+  // ── Pulse Points ──────────────────────────────────────────
+
+  _clearPulsePoints() {
+    for (const dot of this.pulseDots) dot.remove();
+    this.pulseDots = [];
+  }
+
+  _renderPulsePoints() {
+    this._clearPulsePoints();
+    const state = this.currentStateId ? this.config.states[this.currentStateId] : null;
+    if (!state || !state.on_click) return;
+
+    const { cols, rows } = this.config.config.grid;
+    const gw = this.gridOverlay.offsetWidth;
+    const gh = this.gridOverlay.offsetHeight;
+    const cellW = gw / cols;
+    const cellH = gh / rows;
+
+    for (const action of state.on_click) {
+      const pulseCells = action.pulse_cells || [];
+      for (const [r, c] of pulseCells) {
+        const dot = document.createElement('div');
+        dot.className = 'pulse-dot';
+        dot.style.left = (c + 0.5) * cellW + 'px';
+        dot.style.top = (r + 0.5) * cellH + 'px';
+        this.gridOverlay.appendChild(dot);
+        this.pulseDots.push(dot);
+      }
+    }
   }
 
   // ── Debug ─────────────────────────────────────────────────

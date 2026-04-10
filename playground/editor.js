@@ -104,7 +104,10 @@ async function selectScene(name) {
     sceneData = dataRes;
     stateOrder = Object.keys(sceneData.states);
     for (const s of Object.values(sceneData.states)) {
-      if (s.on_click) s.on_click.forEach(a => { a.regions = normRegions(a.regions); });
+      if (s.on_click) s.on_click.forEach(a => {
+      a.regions = normRegions(a.regions);
+      if (!a.pulse_cells) a.pulse_cells = [];
+    });
     }
   } else {
     sceneData = { config: { grid: { cols: 5, rows: 2 } }, resources: {}, states: {}, initialState: '' };
@@ -330,7 +333,7 @@ function addAction(stateId) {
   const { cols, rows } = sceneData.config.grid;
   const allCells = [];
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push([r, c]);
-  s.on_click.push({ regions: allCells, target: '' });
+  s.on_click.push({ regions: allCells, target: '', pulse_cells: [] });
   markDirty();
   renderStates();
 }
@@ -407,6 +410,24 @@ function setActionTarget(stateId, idx, target) {
   markDirty();
 }
 
+function togglePulseCell(stateId, idx, r, c) {
+  const action = sceneData.states[stateId].on_click[idx];
+  if (!action.pulse_cells) action.pulse_cells = [];
+  const exists = action.pulse_cells.findIndex(([pr, pc]) => pr === r && pc === c);
+  if (exists >= 0) {
+    action.pulse_cells.splice(exists, 1);
+  } else {
+    // 只允许选择 regions 中已有的 cell
+    const inRegion = action.regions === '*' || action.regions.some(([rr, rc]) => rr === r && rc === c);
+    if (inRegion) {
+      action.pulse_cells.push([r, c]);
+      action.pulse_cells.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    }
+  }
+  markDirty();
+  renderStates();
+}
+
 function renderActions(stateId, actions) {
   if (!actions.length) return '<div style="color:#3f3f46;font-size:12px">暂无规则</div>';
   const { cols, rows } = sceneData.config.grid;
@@ -440,6 +461,32 @@ function renderActions(stateId, actions) {
       </div>`;
     }
 
+    // Pulse cell selector grid
+    const pulseSet = new Set((a.pulse_cells || []).map(([r, c]) => cellKey(r, c)));
+    const regionSet = isWild
+      ? new Set(Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => cellKey(r, c))).flat())
+      : new Set(a.regions.map(([r, c]) => cellKey(r, c)));
+
+    let pulseGridHtml = '';
+    if (regionSet.size > 0) {
+      let pCells = '';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const key = cellKey(r, c);
+          const inRegion = regionSet.has(key);
+          const isPulse = pulseSet.has(key);
+          const cls = inRegion ? (isPulse ? 'pulse-cell available active' : 'pulse-cell available') : 'pulse-cell';
+          const onclick = inRegion ? `onclick="togglePulseCell('${esc(stateId)}',${idx},${r},${c})"` : '';
+          pCells += `<div class="${cls}" ${onclick}>${isPulse ? '●' : ''}</div>`;
+        }
+      }
+      pulseGridHtml = `<div class="pulse-section">
+        <label class="pulse-label">触发点（脉冲圆点）</label>
+        <div class="pulse-grid" style="grid-template-columns:repeat(${cols},1fr)">${pCells}</div>
+        <div class="pulse-hint">点击已选区域中的格子来设置脉冲提示点</div>
+      </div>`;
+    }
+
     return `<div class="action-card">
       <div class="action-top">
         <span class="action-label">规则 ${idx + 1}</span>
@@ -449,6 +496,7 @@ function renderActions(stateId, actions) {
         <label><input type="checkbox" ${isWild ? 'checked' : ''} onchange="setActionWildcard('${esc(stateId)}',${idx},this.checked)"> 匹配全部区域（*通配）</label>
       </div>
       ${gridHtml}
+      ${pulseGridHtml}
       <div class="action-target">
         <label>跳转到 →</label>
         <select onchange="setActionTarget('${esc(stateId)}',${idx},this.value)">

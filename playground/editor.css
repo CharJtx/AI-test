@@ -169,6 +169,28 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .region-cell.selected { background: #1e3a5f; border-color: #3b82f6; }
 .region-cell.selected:hover { background: #1e40af; }
 
+/* ── Pulse Cell Selector ── */
+.pulse-section { margin-top: 8px; }
+.pulse-label { font-size: 12px; color: #a1a1aa; margin-bottom: 4px; display: block; }
+.pulse-grid {
+  display: grid; gap: 3px; margin: 4px 0;
+}
+.pulse-cell {
+  aspect-ratio: 1; border-radius: 4px; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: #18181b; border: 1px solid #27272a; color: transparent;
+  transition: all 0.1s;
+}
+.pulse-cell.available {
+  cursor: pointer; border-color: #3f3f46; color: #3f3f46;
+}
+.pulse-cell.available:hover { border-color: #f97316; background: #1c1c1f; }
+.pulse-cell.active {
+  background: rgba(249, 115, 22, 0.2); border-color: #f97316; color: #f97316;
+}
+.pulse-cell.active:hover { background: rgba(249, 115, 22, 0.3); }
+.pulse-hint { font-size: 11px; color: #52525b; margin-top: 2px; }
+
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px);
