@@ -2903,14 +2903,18 @@ async def auto_tag_gallery(char_id: int, request: Request):
                 results.append({"id": img["id"], "error": "file not found"})
                 continue
 
-            img_bytes = img_path.read_bytes()
-            ct = "image/png"
-            if img["filename"].endswith(".jpg") or img["filename"].endswith(".jpeg"):
-                ct = "image/jpeg"
-            elif img["filename"].endswith(".webp"):
-                ct = "image/webp"
+            # 将图片 resize 并统一转为 PNG，避免原图过大或格式不兼容
+            try:
+                pil_img = Image.open(img_path)
+                pil_img.thumbnail((1024, 1024))
+                buf = io.BytesIO()
+                pil_img.convert("RGB").save(buf, format="PNG")
+                img_bytes = buf.getvalue()
+            except Exception as e:
+                results.append({"id": img["id"], "error": f"image read error: {e}"})
+                continue
             b64 = base64.b64encode(img_bytes).decode()
-            data_url = f"data:{ct};base64,{b64}"
+            data_url = f"data:image/png;base64,{b64}"
 
             try:
                 resp = await client.post(
@@ -2937,7 +2941,8 @@ async def auto_tag_gallery(char_id: int, request: Request):
                     img["description"] = desc
                     results.append({"id": img["id"], "description": desc})
                 else:
-                    results.append({"id": img["id"], "error": f"API {resp.status_code}"})
+                    err_detail = resp.text[:200] if resp.text else ""
+                    results.append({"id": img["id"], "error": f"API {resp.status_code}: {err_detail}"})
             except Exception as e:
                 results.append({"id": img["id"], "error": str(e)})
 
