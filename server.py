@@ -2876,7 +2876,7 @@ Return ONLY the description text, no labels or quotes."""
 async def auto_tag_gallery(char_id: int, request: Request):
     """用多模态 LLM 为图库中未标注的图片批量生成描述。"""
     body = await request.json()
-    model = body.get("model", "google/gemini-2.5-flash-preview")
+    model = body.get("model", "x-ai/grok-4.1-fast")
     image_ids = body.get("image_ids", [])  # 空 = 全部未标注的
 
     images = _load_gallery(char_id)
