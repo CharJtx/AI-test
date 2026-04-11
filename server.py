@@ -63,9 +63,11 @@ app.add_middleware(NoCacheStaticMiddleware)
 DATA_DIR = Path(os.getenv("APP_DATA_DIR", "data"))
 SCENES_DIR = Path(os.getenv("APP_SCENES_DIR", "playground/scenes"))
 AVATARS_DIR = Path(os.getenv("APP_AVATARS_DIR", "/appdata/avatars"))
+GALLERIES_DIR = Path(os.getenv("APP_GALLERIES_DIR", "/appdata/galleries"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 SCENES_DIR.mkdir(parents=True, exist_ok=True)
 AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+GALLERIES_DIR.mkdir(parents=True, exist_ok=True)
 PRESETS_FILE = DATA_DIR / "presets.json"       # 推理参数预设
 WORLDBOOKS_FILE = DATA_DIR / "worldbooks.json"  # 世界观设定集
 CHARACTERS_FILE = DATA_DIR / "characters.json"  # 角色卡数据
@@ -2297,8 +2299,9 @@ async def chat(request: Request):
     rp_hint = RP_INSTRUCTIONS.get(rp_mode, "")
     visual_hint = RP_INSTRUCTIONS.get("visual_scene_hint", "") if character and rp_mode != "voice" else ""
     wb_context = _gather_worldbook_context(conversation)
+    gallery_hint = _build_gallery_prompt(character["id"]) if character and character.get("id") else ""
 
-    full_system = "\n\n".join(p for p in [char_system, rp_hint, visual_hint, wb_context] if p)
+    full_system = "\n\n".join(p for p in [char_system, rp_hint, visual_hint, gallery_hint, wb_context] if p)
 
     messages = []
     if full_system:
@@ -2794,6 +2797,199 @@ async def remove_character_avatar(char_id: int):
     char["avatar_type"] = ""
     save_characters(chars)
     return {"ok": True}
+
+
+# ── 角色差分图图库（Gallery）────────────────────────────────
+
+def _gallery_meta_path(char_id: int) -> Path:
+    return GALLERIES_DIR / f"{char_id}.json"
+
+def _gallery_dir(char_id: int) -> Path:
+    d = GALLERIES_DIR / str(char_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def _load_gallery(char_id: int) -> list[dict]:
+    p = _gallery_meta_path(char_id)
+    if p.exists():
+        return json.loads(p.read_text(encoding="utf-8")).get("images", [])
+    return []
+
+def _save_gallery(char_id: int, images: list[dict]):
+    p = _gallery_meta_path(char_id)
+    p.write_text(json.dumps({"images": images}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.get("/api/characters/{char_id}/gallery")
+async def get_gallery(char_id: int):
+    """获取角色的差分图图库。"""
+    return {"images": _load_gallery(char_id)}
+
+
+@app.post("/api/characters/{char_id}/gallery")
+async def upload_gallery_images(char_id: int, files: list[UploadFile] = File(...)):
+    """批量上传差分图到角色图库。"""
+    images = _load_gallery(char_id)
+    gdir = _gallery_dir(char_id)
+    uploaded = []
+
+    for f in files:
+        raw = await f.read()
+        # 生成唯一 ID
+        ts = int(datetime.now(timezone.utc).timestamp() * 1000)
+        img_id = f"img_{ts}_{len(images) + len(uploaded) + 1}"
+        ext = (f.filename or "").rsplit(".", 1)[-1].lower() if f.filename else "png"
+        if ext not in ("png", "jpg", "jpeg", "gif", "webp"):
+            ext = "png"
+        fname = f"{img_id}.{ext}"
+
+        # 保存原图
+        (gdir / fname).write_bytes(raw)
+
+        entry = {
+            "id": img_id,
+            "filename": fname,
+            "description": "",
+            "original_name": f.filename or "",
+        }
+        images.append(entry)
+        uploaded.append(entry)
+
+    _save_gallery(char_id, images)
+    return {"uploaded": uploaded, "total": len(images)}
+
+
+GALLERY_AUTO_TAG_SYSTEM = """You are an expert at describing character expression images for a visual novel / roleplay system.
+
+Given a character image, write a SHORT description (15-30 words) that covers:
+- Facial expression and emotion
+- Body pose and gesture
+- Clothing state
+- Setting/background (if visible)
+
+The description will be injected into an LLM's system prompt so it can select the right image during roleplay.
+Write in the SAME language as any provided character name/context (Chinese name → Chinese description, English → English).
+Return ONLY the description text, no labels or quotes."""
+
+
+@app.post("/api/characters/{char_id}/gallery/auto-tag")
+async def auto_tag_gallery(char_id: int, request: Request):
+    """用多模态 LLM 为图库中未标注的图片批量生成描述。"""
+    body = await request.json()
+    model = body.get("model", "google/gemini-2.5-flash-preview")
+    image_ids = body.get("image_ids", [])  # 空 = 全部未标注的
+
+    images = _load_gallery(char_id)
+    gdir = _gallery_dir(char_id)
+
+    # 获取角色名用于语言提示
+    chars = load_characters()
+    char = next((c for c in chars if c["id"] == char_id), None)
+    char_context = f"Character name: {char['name']}" if char else ""
+
+    to_tag = []
+    for img in images:
+        if image_ids and img["id"] not in image_ids:
+            continue
+        if not image_ids and img.get("description"):
+            continue  # 跳过已有描述的
+        to_tag.append(img)
+
+    results = []
+    async with httpx.AsyncClient(timeout=60) as client:
+        for img in to_tag:
+            img_path = gdir / img["filename"]
+            if not img_path.exists():
+                results.append({"id": img["id"], "error": "file not found"})
+                continue
+
+            img_bytes = img_path.read_bytes()
+            ct = "image/png"
+            if img["filename"].endswith(".jpg") or img["filename"].endswith(".jpeg"):
+                ct = "image/jpeg"
+            elif img["filename"].endswith(".webp"):
+                ct = "image/webp"
+            b64 = base64.b64encode(img_bytes).decode()
+            data_url = f"data:{ct};base64,{b64}"
+
+            try:
+                resp = await client.post(
+                    f"{OPENROUTER_BASE}/chat/completions",
+                    json={
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": GALLERY_AUTO_TAG_SYSTEM},
+                            {"role": "user", "content": [
+                                {"type": "image_url", "image_url": {"url": data_url}},
+                                {"type": "text", "text": f"Describe this character image.\n{char_context}"},
+                            ]},
+                        ],
+                        "temperature": 0.3,
+                        "max_tokens": 100,
+                    },
+                    headers={
+                        "Authorization": f"Bearer {get_api_key()}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                if resp.status_code == 200:
+                    desc = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    img["description"] = desc
+                    results.append({"id": img["id"], "description": desc})
+                else:
+                    results.append({"id": img["id"], "error": f"API {resp.status_code}"})
+            except Exception as e:
+                results.append({"id": img["id"], "error": str(e)})
+
+    _save_gallery(char_id, images)
+    return {"results": results, "tagged": sum(1 for r in results if "description" in r)}
+
+
+@app.put("/api/characters/{char_id}/gallery/{img_id}")
+async def update_gallery_image(char_id: int, img_id: str, request: Request):
+    """更新图库图片的描述。"""
+    body = await request.json()
+    images = _load_gallery(char_id)
+    for img in images:
+        if img["id"] == img_id:
+            if "description" in body:
+                img["description"] = body["description"]
+            _save_gallery(char_id, images)
+            return {"image": img}
+    return JSONResponse({"error": "not found"}, status_code=404)
+
+
+@app.delete("/api/characters/{char_id}/gallery/{img_id}")
+async def delete_gallery_image(char_id: int, img_id: str):
+    """删除图库中的一张图片。"""
+    images = _load_gallery(char_id)
+    target = next((img for img in images if img["id"] == img_id), None)
+    if not target:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    # 删除文件
+    fpath = _gallery_dir(char_id) / target["filename"]
+    if fpath.exists():
+        fpath.unlink()
+
+    images = [img for img in images if img["id"] != img_id]
+    _save_gallery(char_id, images)
+    return {"ok": True}
+
+
+def _build_gallery_prompt(char_id: int) -> str:
+    """构建图库描述文本，用于注入 system prompt。"""
+    images = _load_gallery(char_id)
+    described = [img for img in images if img.get("description")]
+    if not described:
+        return ""
+
+    lines = ["[Character Expression Gallery — select the best matching image by appending {{IMG:image_id}} at the end of your reply]"]
+    for img in described:
+        lines.append(f"  {img['id']}: {img['description']}")
+    lines.append("When your reply depicts a visual scene, choose the most fitting image and append {{IMG:image_id}} on a new line at the very end.")
+    lines.append("If no image matches well, do NOT append any {{IMG:...}} tag.")
+    return "\n".join(lines)
 
 
 def _build_png_with_chara(img_bytes: bytes, chara_json: str) -> bytes:
@@ -3476,6 +3672,7 @@ async def healthz():
 # 挂载顺序重要：更具体的路径在前，/ 在最后
 # /scenes-data 指向 SCENES_DIR（可能是外部持久卷），支持 Range 请求和视频拖拽
 app.mount("/avatars", StaticFiles(directory=str(AVATARS_DIR)), name="avatars")
+app.mount("/galleries", StaticFiles(directory=str(GALLERIES_DIR)), name="galleries")
 app.mount("/scenes-data", StaticFiles(directory=str(SCENES_DIR)), name="scene-data-files")
 app.mount("/playground", StaticFiles(directory="playground", html=True), name="playground")
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

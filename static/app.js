@@ -32,6 +32,7 @@ const state = {
   activeCharId: null,    // 当前激活的角色卡 ID（本地为数字 id，KOL 为 key 字符串）
   streaming: false,      // 是否正在进行流式响应
   userName: localStorage.getItem("userName") || "用户",
+  activeGallery: [],     // 当前角色的差分图图库
 };
 
 // ── DOM 元素引用 ─────────────────────────────────────────
@@ -108,6 +109,7 @@ const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
 const $charTags = document.getElementById("char-tags");
 const $btnRemixChar = document.getElementById("btn-remix-char");
+const $btnGalleryChar = document.getElementById("btn-gallery-char");
 const $btnExportChar = document.getElementById("btn-export-char");
 const $btnEditChar = document.getElementById("btn-edit-char");
 const $btnDeleteChar = document.getElementById("btn-delete-char");
@@ -156,6 +158,10 @@ function setupEvents() {
   $btnExportChar?.addEventListener("click", () => {
     const c = getActiveChar();
     if (c) openExportDialog(c);
+  });
+  $btnGalleryChar?.addEventListener("click", () => {
+    const c = getActiveChar();
+    if (c) openGalleryManager(c.id);
   });
   $btnDeleteChar.addEventListener("click", deleteCharacter);
   $btnSendGreeting.addEventListener("click", sendGreeting);
@@ -369,9 +375,12 @@ function renderMessages(modelId) {
       const visualHint = (isFinishedAssistant && m._showImgBtn)
         ? `<div class="visual-scene-hint"><button class="visual-hint-btn" data-model="${escapeHtml(modelId)}" data-idx="${idx}">✨ 这个画面很美，点击生成图片</button></div>`
         : "";
+      const matchedImg = (isFinishedAssistant && m._matchedImage)
+        ? `<div class="matched-image"><img src="${m._matchedImage}" alt="scene" loading="lazy" onclick="this.classList.toggle('expanded')"></div>`
+        : "";
       return `<div class="message ${m.role}"><div class="content">${html}</div>${
         m._streaming ? '<span class="streaming-cursor"></span>' : ""
-      }${actions}${visualHint}</div>`;
+      }${actions}${matchedImg}${visualHint}</div>`;
     })
     .join("");
 
@@ -730,6 +739,7 @@ function _wrapAsDialogue(text) {
 function renderMarkdown(text) {
   try {
     let cleaned = text.replace(/^\s*\[#[^\]]*\]\s*/, "");
+    cleaned = cleaned.replace(/\n?\{\{IMG:[^}]*\}\}\s*$/, "");
     cleaned = cleaned.replace(/\n?\{\{IMG\}\}\s*$/, "");
     return renderRpContent(cleaned);
   } catch {
@@ -947,13 +957,34 @@ async function streamChat(modelId, params) {
 
   delete state.conversations[modelId][msgIdx]._streaming;
 
-  // 检测并剥离 LLM 输出末尾的 {{IMG}} 标志位
+  // 检测并剥离 LLM 输出末尾的 {{IMG:xxx}} 差分图标记 和 {{IMG}} 生图标记
+  let _rawContent = state.conversations[modelId][msgIdx].content;
+
+  // 先检测差分图 {{IMG:image_id}}
+  const _galleryTagRe = /\n?\{\{IMG:([^}]+)\}\}\s*$/;
+  const _galleryMatch = _rawContent.match(_galleryTagRe);
+  if (_galleryMatch) {
+    _rawContent = _rawContent.replace(_galleryTagRe, "").trimEnd();
+    const char = getActiveChar();
+    const imgId = _galleryMatch[1].trim();
+    if (char && state.activeGallery.length) {
+      // 从图库中查找 ID 对应的文件名
+      const galleryImg = state.activeGallery.find(g => g.id === imgId);
+      if (galleryImg) {
+        state.conversations[modelId][msgIdx]._matchedImage = `/galleries/${char.id}/${encodeURIComponent(galleryImg.filename)}`;
+        state.conversations[modelId][msgIdx]._matchedImageId = imgId;
+      }
+    }
+  }
+
+  // 再检测生图 {{IMG}}
   const _imgTagRe = /\n?\{\{IMG\}\}\s*$/;
-  const _rawContent = state.conversations[modelId][msgIdx].content;
   if (_imgTagRe.test(_rawContent)) {
-    state.conversations[modelId][msgIdx].content = _rawContent.replace(_imgTagRe, "").trimEnd();
+    _rawContent = _rawContent.replace(_imgTagRe, "").trimEnd();
     state.conversations[modelId][msgIdx]._showImgBtn = true;
   }
+
+  state.conversations[modelId][msgIdx].content = _rawContent;
 
   renderMessages(modelId);
 
@@ -1621,6 +1652,14 @@ function onCharSelect() {
     const id = parseInt($charSelect.value);
     state.activeCharId = id || null;
   }
+  // 加载角色差分图图库
+  state.activeGallery = [];
+  if (state.activeCharId && state.charSource === "local") {
+    fetch(`/api/characters/${state.activeCharId}/gallery`)
+      .then(r => r.json())
+      .then(d => { state.activeGallery = d.images || []; })
+      .catch(() => {});
+  }
   renderCharInfo();
 }
 
@@ -1790,6 +1829,124 @@ function openExportDialog(char) {
     download(`/api/characters/${char.id}/export?format=png`);
   });
   document.getElementById("export-cancel").addEventListener("click", () => overlay.remove());
+}
+
+async function openGalleryManager(charId) {
+  const resp = await fetch(`/api/characters/${charId}/gallery`);
+  let gallery = (await resp.json()).images || [];
+
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+
+  function render() {
+    const grid = gallery.map((img) => `
+      <div class="gallery-item" data-id="${escapeHtml(img.id)}">
+        <img src="/galleries/${charId}/${encodeURIComponent(img.filename)}" loading="lazy">
+        <input class="gallery-desc" value="${escapeHtml(img.description || '')}" placeholder="描述..."
+          onchange="this.dataset.dirty='1'" data-img-id="${escapeHtml(img.id)}">
+        <div class="gallery-item-actions">
+          <span class="gallery-id">${escapeHtml(img.id)}</span>
+          <button class="btn danger small gallery-del-btn" data-img-id="${escapeHtml(img.id)}">×</button>
+        </div>
+      </div>
+    `).join('');
+
+    overlay.innerHTML = `
+      <div class="dialog gallery-dialog">
+        <h3>差分图图库 (${gallery.length})</h3>
+        <div class="gallery-toolbar">
+          <button id="gal-upload-btn" class="btn small">上传图片</button>
+          <button id="gal-auto-tag-btn" class="btn small">AI 自动打标</button>
+          <button id="gal-save-desc-btn" class="btn small primary">保存描述</button>
+          <input type="file" id="gal-file-input" accept="image/*" multiple hidden>
+        </div>
+        <div id="gal-progress" class="gallery-progress" hidden></div>
+        <div class="gallery-grid">${grid || '<div class="empty-hint">暂无图片，点击上传</div>'}</div>
+        <div class="dialog-actions"><button id="gal-close">关闭</button></div>
+      </div>`;
+
+    // Bind events after render
+    overlay.querySelector("#gal-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#gal-upload-btn").addEventListener("click", () => overlay.querySelector("#gal-file-input").click());
+    overlay.querySelector("#gal-file-input").addEventListener("change", async (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      e.target.value = "";
+      const prog = overlay.querySelector("#gal-progress");
+      prog.hidden = false;
+      prog.textContent = `上传中... 0/${files.length}`;
+
+      const fd = new FormData();
+      files.forEach((f) => fd.append("files", f));
+      const r = await fetch(`/api/characters/${charId}/gallery`, { method: "POST", body: fd });
+      const data = await r.json();
+      prog.textContent = `上传完成: ${data.uploaded?.length || 0} 张`;
+
+      // Reload gallery
+      const gr = await fetch(`/api/characters/${charId}/gallery`);
+      gallery = (await gr.json()).images || [];
+      render();
+    });
+
+    overlay.querySelector("#gal-auto-tag-btn").addEventListener("click", async () => {
+      const untagged = gallery.filter((img) => !img.description).length;
+      const total = gallery.length;
+      if (!total) return alert("图库为空");
+      const msg = untagged > 0 ? `将为 ${untagged} 张未标注图片生成描述` : `所有 ${total} 张图片已有描述，是否全部重新标注？`;
+      if (!confirm(msg)) return;
+
+      const prog = overlay.querySelector("#gal-progress");
+      prog.hidden = false;
+      prog.textContent = "AI 标注中，请稍候...";
+
+      const ids = untagged > 0 ? [] : gallery.map((img) => img.id); // 空=只标未标注的
+      const r = await fetch(`/api/characters/${charId}/gallery/auto-tag`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_ids: ids }),
+      });
+      const data = await r.json();
+      prog.textContent = `标注完成: ${data.tagged}/${data.results?.length || 0}`;
+
+      const gr = await fetch(`/api/characters/${charId}/gallery`);
+      gallery = (await gr.json()).images || [];
+      render();
+    });
+
+    overlay.querySelector("#gal-save-desc-btn").addEventListener("click", async () => {
+      const inputs = overlay.querySelectorAll(".gallery-desc[data-dirty='1']");
+      let saved = 0;
+      for (const input of inputs) {
+        const imgId = input.dataset.imgId;
+        await fetch(`/api/characters/${charId}/gallery/${imgId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ description: input.value }),
+        });
+        input.dataset.dirty = "";
+        saved++;
+      }
+      if (saved) {
+        const gr = await fetch(`/api/characters/${charId}/gallery`);
+        gallery = (await gr.json()).images || [];
+        alert(`已保存 ${saved} 条描述`);
+      }
+    });
+
+    // Delete buttons
+    overlay.querySelectorAll(".gallery-del-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const imgId = btn.dataset.imgId;
+        if (!confirm("确定删除？")) return;
+        await fetch(`/api/characters/${charId}/gallery/${imgId}`, { method: "DELETE" });
+        gallery = gallery.filter((img) => img.id !== imgId);
+        render();
+      });
+    });
+  }
+
+  document.body.appendChild(overlay);
+  render();
 }
 
 async function deleteCharacter() {
