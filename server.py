@@ -2801,16 +2801,25 @@ async def remove_character_avatar(char_id: int):
 
 # ── 服装识别与更新（Outfit Recognition）──────────────────────
 
-OUTFIT_EXTRACT_SYSTEM = """You are an expert at describing character clothing and appearance from an image.
+OUTFIT_EXTRACT_SYSTEM = """You are an expert at describing character CLOTHING ONLY from an image.
 
-Given a character image, output a SHORT description (20-50 words) of the character's CURRENT outfit and look. Focus on:
+Given a character image, output a SHORT description (20-50 words) of ONLY the character's current OUTFIT. Focus strictly on:
 - Top clothing (shirt, top, dress, lingerie, etc.) — color, material, style, state (buttoned/unbuttoned, revealing, etc.)
 - Bottom clothing (pants, skirt, shorts, etc.) — color, material, style
 - Undergarments if visible
-- Accessories (jewelry, hat, stockings, shoes)
-- Hair state if notable (messy, wet, tied up, etc.)
+- Accessories (jewelry, hat, stockings, shoes, gloves, belts)
 
-Output ONLY the description text in a natural single paragraph. No labels, no lists, no quotes.
+CRITICAL EXCLUSIONS — do NOT mention any of these:
+- Facial expressions (stern, smiling, angry, sad, pouting, blushing, etc.)
+- Mood or emotion
+- Body pose or posture (sitting, standing, crossed arms, etc.)
+- Actions or gestures
+- Hair style/state (these are part of character's fixed appearance, not outfit)
+- Background, setting, lighting
+
+These are TEMPORARY/situational attributes that should NOT be baked into the character's permanent description.
+
+Output ONLY the outfit description in a natural single paragraph. No labels, no lists, no quotes.
 Match the language context (will be provided)."""
 
 
@@ -2824,8 +2833,13 @@ Your task:
 - If the existing description ALREADY contains a specific current outfit description (e.g., "She is currently wearing..." or a paragraph detailing her specific current clothes), REPLACE that specific outfit description with the new one.
 - If the existing description only has GENERAL clothing preferences (e.g., "She likes wearing black crop tops") or no specific current outfit, ADD a new sentence/paragraph describing her current outfit at a natural location (usually after appearance/physical description).
 - PRESERVE all other content: personality traits, background, relationships, scenarios, kinks, etc.
-- Write in the SAME language as the existing description.
 
+CRITICAL — when inserting/replacing the outfit description:
+- Include ONLY clothing items, accessories, and undergarments.
+- Strip out any facial expression, mood, posture, pose, or temporary behavioral descriptions from the new outfit text before integrating.
+- The outfit section should describe what she wears, NOT how she looks or feels at this moment.
+
+Write in the SAME language as the existing description.
 Return ONLY the updated full description text, no explanation, no labels, no markdown."""
 
 
