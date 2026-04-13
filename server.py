@@ -2799,6 +2799,123 @@ async def remove_character_avatar(char_id: int):
     return {"ok": True}
 
 
+# ── 服装识别与更新（Outfit Recognition）──────────────────────
+
+OUTFIT_EXTRACT_SYSTEM = """You are an expert at describing character clothing and appearance from an image.
+
+Given a character image, output a SHORT description (20-50 words) of the character's CURRENT outfit and look. Focus on:
+- Top clothing (shirt, top, dress, lingerie, etc.) — color, material, style, state (buttoned/unbuttoned, revealing, etc.)
+- Bottom clothing (pants, skirt, shorts, etc.) — color, material, style
+- Undergarments if visible
+- Accessories (jewelry, hat, stockings, shoes)
+- Hair state if notable (messy, wet, tied up, etc.)
+
+Output ONLY the description text in a natural single paragraph. No labels, no lists, no quotes.
+Match the language context (will be provided)."""
+
+
+OUTFIT_MERGE_SYSTEM = """You are an expert editor updating a character card's description field.
+
+You will receive:
+1. The existing character description
+2. A new "current outfit" description extracted from an image
+
+Your task:
+- If the existing description ALREADY contains a specific current outfit description (e.g., "She is currently wearing..." or a paragraph detailing her specific current clothes), REPLACE that specific outfit description with the new one.
+- If the existing description only has GENERAL clothing preferences (e.g., "She likes wearing black crop tops") or no specific current outfit, ADD a new sentence/paragraph describing her current outfit at a natural location (usually after appearance/physical description).
+- PRESERVE all other content: personality traits, background, relationships, scenarios, kinks, etc.
+- Write in the SAME language as the existing description.
+
+Return ONLY the updated full description text, no explanation, no labels, no markdown."""
+
+
+@app.post("/api/characters/{char_id}/outfit")
+async def update_character_outfit(char_id: int, image: UploadFile = File(...), model: str = Form("x-ai/grok-4.1-fast")):
+    """通过上传图片识别角色当前服装，并智能更新到角色卡 description 字段。"""
+    chars = load_characters()
+    char = next((c for c in chars if c["id"] == char_id), None)
+    if not char:
+        return JSONResponse({"error": "not found"}, status_code=404)
+
+    img_bytes = await image.read()
+
+    # Resize 并转为 PNG
+    try:
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        pil_img.thumbnail((1024, 1024))
+        buf = io.BytesIO()
+        pil_img.convert("RGB").save(buf, format="PNG")
+        img_bytes_png = buf.getvalue()
+    except Exception as e:
+        return JSONResponse({"error": f"图片处理失败: {e}"}, status_code=400)
+
+    b64 = base64.b64encode(img_bytes_png).decode()
+    data_url = f"data:image/png;base64,{b64}"
+
+    # Step 1: 从图片提取服装描述
+    lang_hint = "Write in the same language as the character name." + (f" Character name: {char.get('name', '')}" if char.get('name') else "")
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp1 = await client.post(
+            f"{OPENROUTER_BASE}/chat/completions",
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": OUTFIT_EXTRACT_SYSTEM},
+                    {"role": "user", "content": [
+                        {"type": "image_url", "image_url": {"url": data_url}},
+                        {"type": "text", "text": f"Describe the character's current outfit in this image.\n{lang_hint}"},
+                    ]},
+                ],
+                "temperature": 0.3,
+                "max_tokens": 200,
+            },
+            headers={"Authorization": f"Bearer {get_api_key()}", "Content-Type": "application/json"},
+        )
+        if resp1.status_code != 200:
+            return JSONResponse({"error": f"服装识别失败: {resp1.status_code} {resp1.text[:200]}"}, status_code=502)
+
+        outfit_desc = resp1.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+        if not outfit_desc:
+            return JSONResponse({"error": "未能识别服装"}, status_code=422)
+
+        # Step 2: 合并到 description
+        existing_desc = char.get("description", "")
+        if not existing_desc.strip():
+            # 没有现有描述，直接用新服装描述
+            new_desc = outfit_desc
+        else:
+            resp2 = await client.post(
+                f"{OPENROUTER_BASE}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": OUTFIT_MERGE_SYSTEM},
+                        {"role": "user", "content": (
+                            f"[Existing description]\n{existing_desc}\n\n"
+                            f"[New current outfit]\n{outfit_desc}\n\n"
+                            f"Please return the updated full description."
+                        )},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 4000,
+                },
+                headers={"Authorization": f"Bearer {get_api_key()}", "Content-Type": "application/json"},
+            )
+            if resp2.status_code != 200:
+                return JSONResponse({"error": f"合并失败: {resp2.status_code} {resp2.text[:200]}"}, status_code=502)
+            new_desc = resp2.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+            if not new_desc:
+                new_desc = existing_desc + "\n\n" + outfit_desc
+
+    char["description"] = new_desc
+    save_characters(chars)
+    return {
+        "outfit_description": outfit_desc,
+        "updated_description": new_desc,
+        "character": char,
+    }
+
+
 # ── 角色差分图图库（Gallery）────────────────────────────────
 
 def _gallery_meta_path(char_id: int) -> Path:

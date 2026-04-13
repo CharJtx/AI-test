@@ -109,6 +109,7 @@ const $charFileInput = document.getElementById("char-file-input");
 const $charInfo = document.getElementById("char-info");
 const $charTags = document.getElementById("char-tags");
 const $btnRemixChar = document.getElementById("btn-remix-char");
+const $btnOutfitChar = document.getElementById("btn-outfit-char");
 const $btnGalleryChar = document.getElementById("btn-gallery-char");
 const $btnExportChar = document.getElementById("btn-export-char");
 const $btnEditChar = document.getElementById("btn-edit-char");
@@ -162,6 +163,10 @@ function setupEvents() {
   $btnGalleryChar?.addEventListener("click", () => {
     const c = getActiveChar();
     if (c) openGalleryManager(c.id);
+  });
+  $btnOutfitChar?.addEventListener("click", () => {
+    const c = getActiveChar();
+    if (c) openOutfitRecognizer(c);
   });
   $btnDeleteChar.addEventListener("click", deleteCharacter);
   $btnSendGreeting.addEventListener("click", sendGreeting);
@@ -1947,6 +1952,119 @@ async function openGalleryManager(charId) {
 
   document.body.appendChild(overlay);
   render();
+}
+
+function openOutfitRecognizer(char) {
+  const overlay = document.createElement("div");
+  overlay.className = "dialog-overlay";
+  overlay.innerHTML = `
+    <div class="dialog" style="max-width:480px;">
+      <h3>识别当前服装「${escapeHtml(char.name)}」</h3>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+        上传一张角色的图片，AI 将识别其当前穿着并智能更新到角色描述中：<br>
+        • 已有"当前穿着"段落 → 替换为新的<br>
+        • 只有宽泛描写（如"她喜欢穿XX"）→ 添加当前具体穿着
+      </div>
+      <div id="outfit-stage" style="margin:12px 0;">
+        <input type="file" id="outfit-file-input" accept="image/*" hidden>
+        <button id="outfit-upload-btn" class="primary" style="padding:10px 16px;width:100%;">📷 选择图片</button>
+      </div>
+      <div id="outfit-preview" style="margin:8px 0;text-align:center;" hidden></div>
+      <div id="outfit-status" style="font-size:12px;color:var(--accent);margin:8px 0;" hidden></div>
+      <div id="outfit-result" style="margin:8px 0;" hidden>
+        <div class="char-field">
+          <label>识别到的服装</label>
+          <div id="outfit-extracted" style="font-size:12px;color:var(--text-muted);padding:6px;background:var(--surface);border-radius:var(--radius);"></div>
+        </div>
+        <div class="char-field" style="margin-top:8px;">
+          <label>更新后的角色描述（可编辑）</label>
+          <textarea id="outfit-new-desc" rows="8" style="font-size:12px;"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions" style="margin-top:12px;">
+        <button id="outfit-cancel">取消</button>
+        <button id="outfit-save" class="primary" hidden>保存到角色卡</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const $fileInput = overlay.querySelector("#outfit-file-input");
+  const $uploadBtn = overlay.querySelector("#outfit-upload-btn");
+  const $preview = overlay.querySelector("#outfit-preview");
+  const $status = overlay.querySelector("#outfit-status");
+  const $result = overlay.querySelector("#outfit-result");
+  const $extracted = overlay.querySelector("#outfit-extracted");
+  const $newDesc = overlay.querySelector("#outfit-new-desc");
+  const $saveBtn = overlay.querySelector("#outfit-save");
+  const $cancelBtn = overlay.querySelector("#outfit-cancel");
+
+  let selectedFile = null;
+
+  $cancelBtn.addEventListener("click", () => overlay.remove());
+  $uploadBtn.addEventListener("click", () => $fileInput.click());
+
+  $fileInput.addEventListener("change", async () => {
+    const file = $fileInput.files[0];
+    if (!file) return;
+    selectedFile = file;
+
+    // 显示预览
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      $preview.innerHTML = `<img src="${e.target.result}" style="max-width:200px;max-height:240px;border-radius:8px;">`;
+      $preview.hidden = false;
+    };
+    reader.readAsDataURL(file);
+
+    // 开始识别
+    $status.hidden = false;
+    $status.textContent = "🔄 AI 识别中，请稍候...";
+    $uploadBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append("image", file);
+
+    try {
+      const resp = await fetch(`/api/characters/${char.id}/outfit`, { method: "POST", body: fd });
+      const data = await resp.json();
+      if (data.error) {
+        $status.textContent = "❌ " + data.error;
+        $status.style.color = "var(--danger)";
+        $uploadBtn.disabled = false;
+        return;
+      }
+      $status.hidden = true;
+      $extracted.textContent = data.outfit_description;
+      $newDesc.value = data.updated_description;
+      $result.hidden = false;
+      $saveBtn.hidden = false;
+    } catch (e) {
+      $status.textContent = "❌ 识别失败: " + e.message;
+      $status.style.color = "var(--danger)";
+      $uploadBtn.disabled = false;
+    }
+  });
+
+  $saveBtn.addEventListener("click", async () => {
+    const finalDesc = $newDesc.value;
+    // 后端已经保存了自动识别的结果，这里允许用户编辑后再次保存
+    const updatedChar = { ...char, description: finalDesc };
+    const resp = await fetch(`/api/characters/${char.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedChar),
+    });
+    if (resp.ok) {
+      // 更新本地状态
+      const idx = state.characters.findIndex((c) => c.id === char.id);
+      if (idx >= 0) state.characters[idx].description = finalDesc;
+      overlay.remove();
+      renderCharInfo();
+      alert("已保存");
+    } else {
+      alert("保存失败");
+    }
+  });
 }
 
 async function deleteCharacter() {
