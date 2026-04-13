@@ -2990,16 +2990,28 @@ async def upload_gallery_images(char_id: int, files: list[UploadFile] = File(...
     return {"uploaded": uploaded, "total": len(images)}
 
 
-GALLERY_AUTO_TAG_SYSTEM = """You are an expert at describing character expression images for a visual novel / roleplay system.
+GALLERY_AUTO_TAG_SYSTEM = """You are an expert at describing character images for a visual novel / roleplay image matching system.
 
-Given a character image, write a SHORT description (15-30 words) that covers:
-- Facial expression and emotion
-- Body pose and gesture
-- Clothing state
-- Setting/background (if visible)
+Given a character image, write a VERY SHORT description (10-20 words) focused on ONLY what VARIES between images of the same character:
+- Facial expression and emotion (e.g. smiling, pouting, blushing, crying, teasing grin)
+- Body pose and gesture (e.g. hugging knees, leaning forward, arms crossed, kneeling)
+- Clothing STATE/action only (e.g. disheveled, strap slipping, pulling down top) — NOT what the clothes look like
 
-The description will be injected into an LLM's system prompt so it can select the right image during roleplay.
-Write in the SAME language as any provided character name/context (Chinese name → Chinese description, English → English).
+CRITICAL EXCLUSIONS — NEVER mention any of these:
+- Hair color, length, or style (it's constant across images of this character)
+- Eye color (it's constant)
+- Skin tone or body proportions (constant)
+- Specific clothing details: color, material, brand (e.g. "white lingerie", "silk dress", "leather") — assume clothes are identical across all images
+- Location / background / setting (e.g. "hotel bed", "bedroom", "outdoor")
+- Lighting or atmosphere (e.g. "candlelit", "sunlit", "dim glow")
+
+BAD example: "Blonde woman with sullen pout and piercing blue eyes, hugging knees on hotel bed, in sheer white lingerie revealing cleavage."
+GOOD example: "Sullen pout, hugging knees tightly, defensive posture."
+
+BAD example: "Smiling happily with seductive blue eyes, kneeling on bed with hands on thighs, in sheer lingerie."
+GOOD example: "Happy seductive smile, kneeling with hands on thighs."
+
+Write in the SAME language as any provided character name/context (Chinese name → Chinese, English → English).
 Return ONLY the description text, no labels or quotes."""
 
 
