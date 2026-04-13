@@ -2369,6 +2369,19 @@ async def generate_hints(request: Request):
 
     char_name = character.get("name", "角色") if character else "角色"
 
+    # 构建角色背景上下文（description + personality + scenario）
+    char_context = ""
+    if character:
+        parts = []
+        if character.get("description"):
+            parts.append(f"[Character Description]\n{character['description']}")
+        if character.get("personality"):
+            parts.append(f"[Personality]\n{character['personality']}")
+        if character.get("scenario"):
+            parts.append(f"[Scenario]\n{character['scenario']}")
+        if parts:
+            char_context = _replace_placeholders("\n\n".join(parts), char_name, user_name)
+
     recent_msgs = conversation[-8:] if len(conversation) > 8 else conversation
     conv_text = "\n".join([
         f"[{user_name}]: {m['content'][:300]}" if m["role"] == "user"
@@ -2410,6 +2423,8 @@ async def generate_hints(request: Request):
         "- Each suggestion: 20-80 words.\n"
         "- The two suggestions should differ in tone (e.g. one gentle/curious, one bold/direct).\n"
         "- Match the language of the conversation (Chinese conversation → Chinese suggestions, English → English).\n"
+        "- Suggestions MUST fit the character's setup (description/personality/scenario) — e.g. if the scenario is a school setting, suggestions should match that context; if the character is shy, respect that dynamic.\n"
+        "- Reference specific details from the character's description when appropriate (outfit, traits, relationship to player) to make suggestions feel grounded.\n"
         "- CRUCIAL: Carefully analyze the ENTIRE conversation to understand the current scene state:\n"
         "  * What has already happened? (clothing removed, positions changed, actions taken)\n"
         "  * What is the current intimacy level? (kissing, touching, undressed, sexual contact, etc.)\n"
@@ -2428,7 +2443,16 @@ async def generate_hints(request: Request):
     if format_rule:
         hint_system = hint_system + "\n\n" + format_rule
 
-    user_msg = f"当前对话记录（最近几轮）：\n{conv_text}\n\n请生成2条建议。" if conv_text else "对话刚刚开始，请生成2条合适的开场输入建议。"
+    # 组装用户消息：角色背景 + 对话记录
+    user_parts = []
+    if char_context:
+        user_parts.append(f"=== 角色背景设定 ===\n{char_context}")
+    if conv_text:
+        user_parts.append(f"=== 最近对话记录 ===\n{conv_text}")
+        user_parts.append("请基于角色设定和对话进展，生成2条适合玩家输入的建议。")
+    else:
+        user_parts.append("对话刚刚开始。请基于角色背景，生成2条合适的开场输入建议，帮助玩家进入这个角色设定的场景。")
+    user_msg = "\n\n".join(user_parts)
 
     messages = [
         {"role": "system", "content": hint_system},
