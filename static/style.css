@@ -640,6 +640,37 @@ header h1 {
   flex-shrink: 0;
 }
 
+.chat-char-desc {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.chat-char-desc summary {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.chat-char-desc summary:hover {
+  color: var(--accent);
+}
+.chat-char-desc-body {
+  padding: 4px 12px 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;

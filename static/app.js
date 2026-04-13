@@ -318,6 +318,14 @@ function renderChatColumns() {
     return;
   }
 
+  const char = getActiveChar();
+  const descHtml = (char && char.description)
+    ? `<details class="chat-char-desc" open>
+         <summary>📋 ${escapeHtml(char.name || "角色")} — 角色设定</summary>
+         <div class="chat-char-desc-body">${renderRpContent(replacePlaceholders(char.description, char.name))}</div>
+       </details>`
+    : "";
+
   $chatColumns.innerHTML = state.selectedModels
     .map((modelId) => {
       const model = state.models.find((m) => m.id === modelId);
@@ -327,6 +335,7 @@ function renderChatColumns() {
         : ' <span class="badge badge-unmoderated">无审核</span>';
       return `<div class="chat-column" data-model="${modelId}">
         <div class="chat-column-header">${shortName}${modBadge}</div>
+        ${descHtml}
         <div class="chat-messages" id="msgs-${CSS.escape(modelId)}"></div>
       </div>`;
     })
@@ -1666,6 +1675,7 @@ function onCharSelect() {
       .catch(() => {});
   }
   renderCharInfo();
+  renderChatColumns();
 }
 
 /**
