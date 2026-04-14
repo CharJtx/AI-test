@@ -24,6 +24,8 @@ const el = {
   btnBrowse:    $('#btn-browse'),
   resList:      $('#resource-list'),
   resCount:     $('#res-count'),
+  urlInput:     $('#url-input'),
+  btnAddUrl:    $('#btn-add-url'),
   initialState: $('#initial-state'),
   stateList:    $('#state-list'),
   btnAddState:  $('#btn-add-state'),
@@ -65,6 +67,10 @@ function bindEvents() {
     el.uploadZone.classList.remove('drag-over');
     uploadFiles(e.dataTransfer.files);
   });
+
+  // URL resource
+  el.btnAddUrl.addEventListener('click', addUrlResource);
+  el.urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addUrlResource(); });
 }
 
 // ── Scene CRUD ───────────────────────────────────────────
@@ -172,19 +178,68 @@ async function deleteResource(filename) {
 }
 
 function renderResources() {
-  el.resCount.textContent = resources.length;
-  if (!resources.length) { el.resList.innerHTML = ''; return; }
+  // 合并：上传的文件 + URL 资源（从 sceneData.resources 中找出 URL 类型的）
+  const allRes = [...resources];
+  for (const [id, val] of Object.entries(sceneData.resources)) {
+    if (typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) {
+      if (!allRes.some(r => r.name === val)) {
+        allRes.push({ name: val, size: 0, isUrl: true });
+      }
+    }
+  }
 
-  el.resList.innerHTML = resources.map(r => {
+  el.resCount.textContent = allRes.length;
+  if (!allRes.length) { el.resList.innerHTML = ''; return; }
+  el.resList.innerHTML = allRes.map(r => {
+    const isUrl = r.isUrl || r.name.startsWith('http://') || r.name.startsWith('https://');
     const id = Object.entries(sceneData.resources).find(([, fn]) => fn === r.name)?.[0] || '';
-    return `<div class="res-item">
+    const displayName = isUrl ? (r.name.length > 50 ? r.name.slice(0, 50) + '…' : r.name) : r.name;
+    const sizeText = isUrl ? '<span class="res-size url-badge">URL</span>' : `<span class="res-size">${fmtSize(r.size)}</span>`;
+    const delBtn = isUrl
+      ? `<button class="res-del" onclick="removeUrlResource('${esc(r.name)}')" title="移除">×</button>`
+      : `<button class="res-del" onclick="deleteResource('${esc(r.name)}')" title="删除">×</button>`;
+    return `<div class="res-item${isUrl ? ' is-url' : ''}">
       <input class="text-input" style="width:80px;font-size:11px" value="${esc(id)}" placeholder="资源ID"
         data-filename="${esc(r.name)}" onchange="renameResource(this)">
-      <span class="res-name" title="${esc(r.name)}">${esc(r.name)}</span>
-      <span class="res-size">${fmtSize(r.size)}</span>
-      <button class="res-del" onclick="deleteResource('${esc(r.name)}')" title="删除">×</button>
+      <span class="res-name" title="${esc(r.name)}">${esc(displayName)}</span>
+      ${sizeText}
+      ${delBtn}
     </div>`;
   }).join('');
+}
+
+function removeUrlResource(url) {
+  for (const [id, fn] of Object.entries(sceneData.resources)) {
+    if (fn === url) delete sceneData.resources[id];
+  }
+  resources = resources.filter(r => r.name !== url);
+  markDirty();
+  renderResources();
+  renderAllStateSelects();
+}
+
+function addUrlResource() {
+  const url = el.urlInput.value.trim();
+  if (!url) return;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    toast('请输入完整的 URL（以 http:// 或 https:// 开头）', true);
+    return;
+  }
+  // 用 URL 的最后一段路径作为默认 ID
+  const urlPath = new URL(url).pathname;
+  const defaultId = urlPath.split('/').pop()?.replace(/\.[^.]+$/, '') || `url_${Date.now()}`;
+  const id = prompt('设置资源 ID：', defaultId);
+  if (!id?.trim()) return;
+
+  // URL 资源直接存入 resources 映射，值为完整 URL
+  sceneData.resources[id.trim()] = url;
+  // 同时加入 resources 列表用于 UI 显示
+  resources.push({ name: url, size: 0, isUrl: true });
+  markDirty();
+  renderResources();
+  renderAllStateSelects();
+  el.urlInput.value = '';
+  toast(`URL 资源「${id.trim()}」已添加`);
 }
 
 function renameResource(input) {

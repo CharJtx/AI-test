@@ -44,7 +44,10 @@ class InteractivePlayer {
       const video = document.createElement('video');
       video.playsInline = true;
       video.preload = 'auto';
-      video.src = this.baseUrl + encodeURIComponent(filename);
+      video.crossOrigin = 'anonymous';
+      // 完整 URL 直接使用，本地文件拼接 baseUrl
+      const isFullUrl = filename.startsWith('http://') || filename.startsWith('https://');
+      video.src = isFullUrl ? filename : this.baseUrl + encodeURIComponent(filename);
       this.videoPool.set(id, video);
       this.videoLayer.appendChild(video);
     }
@@ -285,7 +288,8 @@ class InteractivePlayer {
       if (!resId) continue;
       const filename = this.config.resources[resId];
       if (!filename) continue;
-      const audio = new Audio(this.baseUrl + encodeURIComponent(filename));
+      const isFullUrl = filename.startsWith('http://') || filename.startsWith('https://');
+      const audio = new Audio(isFullUrl ? filename : this.baseUrl + encodeURIComponent(filename));
       audio.loop = !!state.loop;
       audio.play().catch(() => {});
       this.activeSounds.push(audio);

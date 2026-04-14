@@ -108,6 +108,11 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .tag.login { background: #4a3728; color: #fbbf24; }
 .tag.pay { background: #4a2848; color: #f0abfc; }
 .gate-flags { display: flex; gap: 16px; flex-wrap: wrap; }
+
+/* ── URL Resource ── */
+.url-add-row { display: flex; gap: 4px; margin: 6px 0; }
+.res-item.is-url { border-left: 2px solid #3b82f6; }
+.url-badge { background: #1e3a5f; color: #60a5fa; padding: 0 6px; border-radius: 3px; font-size: 10px; }
 .state-collapse { color: #52525b; font-size: 14px; transition: transform 0.2s; }
 .state-card.open .state-collapse { transform: rotate(90deg); }
 

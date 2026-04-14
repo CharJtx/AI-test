@@ -41,8 +41,12 @@
       <section class="card" id="sec-resources">
         <h2>素材 <span id="res-count" class="badge">0</span></h2>
         <div id="upload-zone" class="upload-zone">
-          <input type="file" id="file-input" multiple accept="video/*" hidden>
-          <div class="upload-hint">拖拽视频文件到此处<br>或 <button id="btn-browse" class="link-btn">点击选择</button></div>
+          <input type="file" id="file-input" multiple accept="video/*,audio/*" hidden>
+          <div class="upload-hint">拖拽文件到此处<br>或 <button id="btn-browse" class="link-btn">点击选择</button></div>
+        </div>
+        <div class="url-add-row">
+          <input type="text" id="url-input" class="text-input" placeholder="输入视频 URL（https://...）" style="flex:1">
+          <button id="btn-add-url" class="btn small">+ URL</button>
         </div>
         <div id="resource-list" class="resource-list"></div>
       </section>
