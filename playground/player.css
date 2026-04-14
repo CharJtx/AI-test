@@ -85,6 +85,28 @@
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
+.player-loading.has-bg,
+.player-start-overlay.has-bg {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.player-loading.has-bg {
+  background-color: #0a0a0a;
+}
+
+.player-loading.has-bg .loading-spinner,
+.player-loading.has-bg .loading-text,
+.player-loading.has-bg .loading-progress,
+.player-start-overlay.has-bg .start-text {
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+}
+
+.player-start-overlay.has-bg {
+  background-color: rgba(0,0,0,0.3);
+}
+
 .loading-spinner {
   width: 40px;
   height: 40px;

@@ -2,7 +2,7 @@
 let currentScene = null;
 let resources = [];
 let sceneData = {
-  config: { grid: { cols: 5, rows: 2 } },
+  config: { grid: { cols: 5, rows: 2 }, loadingBg: '' },
   resources: {},
   states: {},
   initialState: '',
@@ -26,6 +26,8 @@ const el = {
   resCount:     $('#res-count'),
   urlInput:     $('#url-input'),
   btnAddUrl:    $('#btn-add-url'),
+  loadingBg:    $('#loading-bg'),
+  loadingBgPreview: $('#loading-bg-preview'),
   initialState: $('#initial-state'),
   stateList:    $('#state-list'),
   btnAddState:  $('#btn-add-state'),
@@ -54,6 +56,12 @@ function bindEvents() {
   el.gridCols.addEventListener('change', () => { sceneData.config.grid.cols = +el.gridCols.value; markDirty(); });
   el.gridRows.addEventListener('change', () => { sceneData.config.grid.rows = +el.gridRows.value; markDirty(); });
   el.initialState.addEventListener('change', () => { sceneData.initialState = el.initialState.value; markDirty(); });
+  el.loadingBg.addEventListener('input', () => {
+    if (!sceneData.config) sceneData.config = {};
+    sceneData.config.loadingBg = el.loadingBg.value.trim();
+    markDirty();
+    updateLoadingBgPreview();
+  });
 
   // File upload
   el.btnBrowse.addEventListener('click', (e) => { e.stopPropagation(); el.fileInput.click(); });
@@ -116,7 +124,7 @@ async function selectScene(name) {
     });
     }
   } else {
-    sceneData = { config: { grid: { cols: 5, rows: 2 } }, resources: {}, states: {}, initialState: '' };
+    sceneData = { config: { grid: { cols: 5, rows: 2 }, loadingBg: '' }, resources: {}, states: {}, initialState: '' };
     stateOrder = [];
   }
 
@@ -626,10 +634,23 @@ function toggleCard(header) {
 function syncToUI() {
   el.gridCols.value = sceneData.config.grid.cols;
   el.gridRows.value = sceneData.config.grid.rows;
+  el.loadingBg.value = sceneData.config.loadingBg || '';
   renderResources();
   renderStates();
   updateInitialSelect();
   updatePreviewLink();
+  updateLoadingBgPreview();
+}
+
+function updateLoadingBgPreview() {
+  const url = sceneData.config.loadingBg || '';
+  if (url) {
+    el.loadingBgPreview.hidden = false;
+    el.loadingBgPreview.innerHTML = `<img src="${esc(url)}" alt="preview" onerror="this.parentElement.innerHTML='<span style=color:#f87171>图片加载失败</span>'">`;
+  } else {
+    el.loadingBgPreview.hidden = true;
+    el.loadingBgPreview.innerHTML = '';
+  }
 }
 
 function updateInitialSelect() {
@@ -662,7 +683,7 @@ function updatePreviewLink() {
 
 function resetEditor() {
   resources = [];
-  sceneData = { config: { grid: { cols: 5, rows: 2 } }, resources: {}, states: {}, initialState: '' };
+  sceneData = { config: { grid: { cols: 5, rows: 2 }, loadingBg: '' }, resources: {}, states: {}, initialState: '' };
   stateOrder = [];
   dirty = false;
   syncToUI();

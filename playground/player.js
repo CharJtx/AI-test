@@ -80,7 +80,12 @@ class InteractivePlayer {
 
   _buildLoadingOverlay() {
     const total = Object.keys(this.config.resources).length;
+    const bgUrl = this.config.config?.loadingBg || '';
     this.loadingOverlay = this._el('div', 'player-loading');
+    if (bgUrl) {
+      this.loadingOverlay.style.backgroundImage = `url(${bgUrl})`;
+      this.loadingOverlay.classList.add('has-bg');
+    }
     this.loadingOverlay.innerHTML = `
       <div class="loading-spinner"></div>
       <div class="loading-text">加载资源中</div>
@@ -92,6 +97,11 @@ class InteractivePlayer {
 
   _buildStartOverlay() {
     this.startOverlay = this._el('div', 'player-start-overlay');
+    const bgUrl = this.config.config?.loadingBg || '';
+    if (bgUrl) {
+      this.startOverlay.style.backgroundImage = `url(${bgUrl})`;
+      this.startOverlay.classList.add('has-bg');
+    }
     this.startOverlay.innerHTML = `
       <div class="start-icon">▶</div>
       <div class="start-text">点击开始</div>
