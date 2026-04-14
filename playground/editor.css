@@ -1,6 +1,6 @@
 /* ── Reset ── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0e0e10; color: #d4d4d8; min-height: 100vh; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0e0e10; color: #d4d4d8; height: 100vh; overflow: hidden; }
 
 /* ── Top Bar ── */
 .topbar {
@@ -33,7 +33,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0e0e10; colo
 
 /* ── Layout ── */
 .editor-layout {
-  display: flex; gap: 0; min-height: calc(100vh - 52px);
+  display: flex; gap: 0; height: calc(100vh - 52px);
 }
 .sidebar {
   width: 300px; min-width: 300px; padding: 16px;
