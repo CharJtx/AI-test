@@ -31,6 +31,7 @@ const el = {
   initialState: $('#initial-state'),
   stateList:    $('#state-list'),
   btnAddState:  $('#btn-add-state'),
+  btnDownloadJson: $('#btn-download-json'),
   toast:        $('#toast'),
 };
 
@@ -51,6 +52,7 @@ function bindEvents() {
   el.sceneSelect.addEventListener('change', () => selectScene(el.sceneSelect.value));
   el.btnNew.addEventListener('click', createScene);
   el.btnSave.addEventListener('click', saveScene);
+  el.btnDownloadJson.addEventListener('click', downloadSceneJson);
   el.btnAddState.addEventListener('click', () => addState());
 
   el.gridCols.addEventListener('change', () => { sceneData.config.grid.cols = +el.gridCols.value; markDirty(); });
@@ -675,6 +677,18 @@ function markDirty() {
 
 function updateSaveBtn() {
   el.btnSave.disabled = !currentScene || !dirty;
+  el.btnDownloadJson.disabled = !currentScene;
+}
+
+function downloadSceneJson() {
+  if (!currentScene) return;
+  const json = JSON.stringify(sceneData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${currentScene}-scene-data.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function updatePreviewLink() {
