@@ -267,7 +267,7 @@ function addState() {
   let idx = stateOrder.length + 1;
   while (sceneData.states[base + idx]) idx++;
   const id = base + idx;
-  sceneData.states[id] = { video: '', loop: true, next: null, sounds: [], on_click: [], require_login: false, require_pay: false };
+  sceneData.states[id] = { video: '', loop: true, next: null, sounds: [], on_click: [], is_basic: false, require_login: false, require_pay: false };
   stateOrder.push(id);
   if (!sceneData.initialState) sceneData.initialState = id;
   markDirty();
@@ -318,6 +318,7 @@ function renderStates() {
     const tags = [
       s.loop ? '<span class="tag loop">LOOP</span>' : '<span class="tag once">ONCE</span>',
       isInit ? '<span class="tag initial">初始</span>' : '',
+      s.is_basic ? '<span class="tag basic">⭐基础</span>' : '',
       s.require_login ? '<span class="tag login">🔒登录</span>' : '',
       s.require_pay ? '<span class="tag pay">💰付费</span>' : '',
     ].join('');
@@ -360,6 +361,10 @@ function renderStates() {
           </div>
         </div>
         <div class="state-field gate-flags">
+          <div class="toggle-row">
+            <input type="checkbox" ${s.is_basic ? 'checked' : ''} onchange="updState('${esc(id)}','is_basic',this.checked)">
+            <span>⭐ 基础状态</span>
+          </div>
           <div class="toggle-row">
             <input type="checkbox" ${s.require_login ? 'checked' : ''} onchange="updState('${esc(id)}','require_login',this.checked)">
             <span>🔒 需要登录</span>
