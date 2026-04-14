@@ -2,7 +2,7 @@
 let currentScene = null;
 let resources = [];
 let sceneData = {
-  config: { grid: { cols: 5, rows: 2 }, loadingBg: '' },
+  config: { grid: { cols: 5, rows: 2 }, loadingBg: '', kolId: '' },
   resources: {},
   states: {},
   initialState: '',
@@ -26,6 +26,7 @@ const el = {
   resCount:     $('#res-count'),
   urlInput:     $('#url-input'),
   btnAddUrl:    $('#btn-add-url'),
+  kolId:        $('#kol-id'),
   loadingBg:    $('#loading-bg'),
   loadingBgPreview: $('#loading-bg-preview'),
   initialState: $('#initial-state'),
@@ -58,6 +59,7 @@ function bindEvents() {
   el.gridCols.addEventListener('change', () => { sceneData.config.grid.cols = +el.gridCols.value; markDirty(); });
   el.gridRows.addEventListener('change', () => { sceneData.config.grid.rows = +el.gridRows.value; markDirty(); });
   el.initialState.addEventListener('change', () => { sceneData.initialState = el.initialState.value; markDirty(); });
+  el.kolId.addEventListener('input', () => { sceneData.config.kolId = el.kolId.value.trim(); markDirty(); });
   el.loadingBg.addEventListener('input', () => {
     if (!sceneData.config) sceneData.config = {};
     sceneData.config.loadingBg = el.loadingBg.value.trim();
@@ -641,6 +643,7 @@ function toggleCard(header) {
 function syncToUI() {
   el.gridCols.value = sceneData.config.grid.cols;
   el.gridRows.value = sceneData.config.grid.rows;
+  el.kolId.value = sceneData.config.kolId || '';
   el.loadingBg.value = sceneData.config.loadingBg || '';
   renderResources();
   renderStates();
