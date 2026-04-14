@@ -82,7 +82,12 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .res-item .res-del:hover { color: #f87171; }
 
 /* ── State List ── */
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; padding: 10px 0;
+  position: sticky; top: 0; z-index: 10;
+  background: #0e0e10;
+}
 .section-header h2 { font-size: 14px; font-weight: 500; color: #a1a1aa; }
 .state-list { display: flex; flex-direction: column; gap: 10px; }
 .empty-hint { color: #3f3f46; font-size: 13px; padding: 40px; text-align: center; }
@@ -192,19 +197,20 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
   display: grid; gap: 3px; margin: 4px 0;
 }
 .pulse-cell {
-  aspect-ratio: 1; border-radius: 4px; font-size: 14px;
+  height: 24px; border-radius: 3px; font-size: 11px;
   display: flex; align-items: center; justify-content: center;
   background: #18181b; border: 1px solid #27272a; color: transparent;
   transition: all 0.1s;
 }
 .pulse-cell.available {
-  cursor: pointer; border-color: #3f3f46; color: #3f3f46;
+  cursor: pointer; border-color: #3f3f46; color: #52525b;
 }
-.pulse-cell.available:hover { border-color: #f97316; background: #1c1c1f; }
+.pulse-cell.available:hover { border-color: #f97316; background: #261a0e; }
 .pulse-cell.active {
-  background: rgba(249, 115, 22, 0.2); border-color: #f97316; color: #f97316;
+  background: #f97316; border-color: #fb923c; color: #fff;
+  font-weight: 700; box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
 }
-.pulse-cell.active:hover { background: rgba(249, 115, 22, 0.3); }
+.pulse-cell.active:hover { background: #ea580c; }
 .pulse-hint { font-size: 11px; color: #52525b; margin-top: 2px; }
 
 /* ── Toast ── */
