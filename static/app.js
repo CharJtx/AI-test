@@ -770,6 +770,22 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ── Toast 提示 ────────────────────────────────────────────
+let _toastTimer = null;
+function showToast(msg, duration = 3000) {
+  let el = document.getElementById("app-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "app-toast";
+    el.className = "app-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove("show"), duration);
+}
+
 // ── 消息发送与流式响应（SSE） ────────────────────────────
 /**
  * 发送用户消息：将输入追加到所有已选模型的对话记录中，
@@ -845,6 +861,12 @@ async function generateHints() {
 
     const data = await resp.json();
     const hints = data.hints || [];
+
+    // 显示 token 消耗
+    if (data.usage) {
+      const u = data.usage;
+      showToast(`Hint 生成 · prompt: ${u.prompt_tokens} / completion: ${u.completion_tokens} / 合计: ${u.total_tokens} tokens`);
+    }
 
     $hintChips.forEach((chip, i) => {
       chip.classList.remove("loading");

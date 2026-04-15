@@ -2481,13 +2481,22 @@ async def generate_hints(request: Request):
             status_code=502,
         )
 
+    resp_data = resp.json()
     content = (
-        resp.json()
+        resp_data
         .get("choices", [{}])[0]
         .get("message", {})
         .get("content", "")
         .strip()
     )
+
+    # 提取 token 消耗信息（OpenRouter 标准格式）
+    usage = resp_data.get("usage") or {}
+    token_usage = {
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "total_tokens": usage.get("total_tokens", 0),
+    }
 
     hints = []
     for line in content.split("\n"):
@@ -2502,7 +2511,7 @@ async def generate_hints(request: Request):
         lines = [l.strip() for l in content.split("\n") if l.strip()]
         hints = lines[:2]
 
-    return {"hints": hints}
+    return {"hints": hints, "usage": token_usage}
 
 
 # ── 预设（Presets）CRUD ─────────────────────────────────────
