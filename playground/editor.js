@@ -451,6 +451,7 @@ function setActionWildcard(stateId, idx, isWild) {
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push([r, c]);
     action.regions = allCells;
   }
+  cleanStalePulseCells(action);
   markDirty();
   renderStates();
 }
@@ -466,6 +467,7 @@ function toggleRegionCell(stateId, idx, r, c) {
     action.regions.push([r, c]);
     action.regions.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   }
+  cleanStalePulseCells(action);
   markDirty();
   renderStates();
 }
@@ -482,6 +484,7 @@ function toggleRegionRow(stateId, idx, r) {
     for (let c = 0; c < cols; c++) set.add(cellKey(r, c));
   }
   action.regions = [...set].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  cleanStalePulseCells(action);
   markDirty();
   renderStates();
 }
@@ -498,6 +501,7 @@ function toggleRegionCol(stateId, idx, c) {
     for (let r = 0; r < rows; r++) set.add(cellKey(r, c));
   }
   action.regions = [...set].map(k => k.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  cleanStalePulseCells(action);
   markDirty();
   renderStates();
 }
@@ -505,6 +509,14 @@ function toggleRegionCol(stateId, idx, c) {
 function setActionTarget(stateId, idx, target) {
   sceneData.states[stateId].on_click[idx].target = target;
   markDirty();
+}
+
+// 清理规则中不在 region 内的 pulse_cells（当 regions 变更后调用）
+function cleanStalePulseCells(action) {
+  if (!action.pulse_cells || !action.pulse_cells.length) return;
+  if (action.regions === '*') return; // 通配：全部保留
+  const regionSet = new Set(action.regions.map(([r, c]) => cellKey(r, c)));
+  action.pulse_cells = action.pulse_cells.filter(([r, c]) => regionSet.has(cellKey(r, c)));
 }
 
 function togglePulseCell(stateId, idx, r, c) {

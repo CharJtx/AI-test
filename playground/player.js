@@ -325,12 +325,15 @@ class InteractivePlayer {
     const cellW = gw / cols;
     const cellH = gh / rows;
 
-    // 汇总所有规则的 pulse_cells，按 (r,c) 去重
+    // 汇总所有规则的 pulse_cells，按 (r,c) 去重，且必须在 regions 内（过滤孤儿数据）
     const uniquePositions = new Set();
     for (const action of state.on_click) {
       const pulseCells = action.pulse_cells || [];
       for (const [r, c] of pulseCells) {
-        uniquePositions.add(`${r},${c}`);
+        // 只保留在 region 内的 pulse_cell
+        const inRegion = action.regions === '*' ||
+          (Array.isArray(action.regions) && action.regions.some(([rr, rc]) => rr === r && rc === c));
+        if (inRegion) uniquePositions.add(`${r},${c}`);
       }
     }
 
