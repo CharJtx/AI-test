@@ -309,7 +309,8 @@ class InteractivePlayer {
   // ── Pulse Points ──────────────────────────────────────────
 
   _clearPulsePoints() {
-    for (const dot of this.pulseDots) dot.remove();
+    // 防御性清除：移除 DOM 中所有 .pulse-dot（不依赖 pulseDots 数组）
+    this.gridOverlay.querySelectorAll('.pulse-dot').forEach(d => d.remove());
     this.pulseDots = [];
   }
 
@@ -324,16 +325,23 @@ class InteractivePlayer {
     const cellW = gw / cols;
     const cellH = gh / rows;
 
+    // 汇总所有规则的 pulse_cells，按 (r,c) 去重
+    const uniquePositions = new Set();
     for (const action of state.on_click) {
       const pulseCells = action.pulse_cells || [];
       for (const [r, c] of pulseCells) {
-        const dot = document.createElement('div');
-        dot.className = 'pulse-dot';
-        dot.style.left = (c + 0.5) * cellW + 'px';
-        dot.style.top = (r + 0.5) * cellH + 'px';
-        this.gridOverlay.appendChild(dot);
-        this.pulseDots.push(dot);
+        uniquePositions.add(`${r},${c}`);
       }
+    }
+
+    for (const key of uniquePositions) {
+      const [r, c] = key.split(',').map(Number);
+      const dot = document.createElement('div');
+      dot.className = 'pulse-dot';
+      dot.style.left = (c + 0.5) * cellW + 'px';
+      dot.style.top = (r + 0.5) * cellH + 'px';
+      this.gridOverlay.appendChild(dot);
+      this.pulseDots.push(dot);
     }
   }
 
