@@ -22,6 +22,7 @@ class InteractivePlayer {
     this.startOverlay = null;
     this.pulseDots = [];
     this.activeSounds = [];
+    this.bgmAudio = null;
   }
 
   async init() {
@@ -109,6 +110,7 @@ class InteractivePlayer {
     this.startOverlay.style.display = 'none';
     this.startOverlay.addEventListener('click', () => {
       this.startOverlay.style.display = 'none';
+      this._startBgm();
       this.enterState(this.config.initialState);
     });
     this.container.appendChild(this.startOverlay);
@@ -278,6 +280,17 @@ class InteractivePlayer {
       left: ox + 'px', top: oy + 'px',
       width: dw + 'px', height: dh + 'px',
     });
+  }
+
+  // ── BGM ───────────────────────────────────────────────────
+
+  _startBgm() {
+    const bgm = this.config.config?.bgm;
+    if (!bgm || !bgm.url) return;
+    this.bgmAudio = new Audio(bgm.url);
+    this.bgmAudio.loop = bgm.loop !== false;
+    this.bgmAudio.volume = bgm.volume ?? 0.5;
+    this.bgmAudio.play().catch(() => {});
   }
 
   // ── Sound Playback ────────────────────────────────────────

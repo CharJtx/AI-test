@@ -2,7 +2,7 @@
 let currentScene = null;
 let resources = [];
 let sceneData = {
-  config: { grid: { cols: 5, rows: 2 }, loadingBg: '', kolId: '' },
+  config: { grid: { cols: 5, rows: 2 }, loadingBg: '', kolId: '', bgm: { url: '', volume: 0.5, loop: true } },
   resources: {},
   states: {},
   initialState: '',
@@ -28,6 +28,11 @@ const el = {
   btnAddUrl:    $('#btn-add-url'),
   kolId:        $('#kol-id'),
   loadingBg:    $('#loading-bg'),
+  bgmUrl:       $('#bgm-url'),
+  bgmVolume:    $('#bgm-volume'),
+  bgmVolVal:    $('#bgm-vol-val'),
+  bgmLoop:      $('#bgm-loop'),
+  bgmPreviewBtn:$('#bgm-preview-btn'),
   loadingBgPreview: $('#loading-bg-preview'),
   initialState: $('#initial-state'),
   stateList:    $('#state-list'),
@@ -60,6 +65,24 @@ function bindEvents() {
   el.gridRows.addEventListener('change', () => { sceneData.config.grid.rows = +el.gridRows.value; markDirty(); });
   el.initialState.addEventListener('change', () => { sceneData.initialState = el.initialState.value; markDirty(); });
   el.kolId.addEventListener('input', () => { sceneData.config.kolId = el.kolId.value.trim(); markDirty(); });
+  // BGM
+  const ensureBgm = () => { if (!sceneData.config.bgm) sceneData.config.bgm = { url: '', volume: 0.5, loop: true }; };
+  el.bgmUrl.addEventListener('input', () => { ensureBgm(); sceneData.config.bgm.url = el.bgmUrl.value.trim(); markDirty(); });
+  el.bgmVolume.addEventListener('input', () => { ensureBgm(); sceneData.config.bgm.volume = +el.bgmVolume.value; el.bgmVolVal.textContent = el.bgmVolume.value; markDirty(); });
+  el.bgmLoop.addEventListener('change', () => { ensureBgm(); sceneData.config.bgm.loop = el.bgmLoop.checked; markDirty(); });
+  let bgmPreviewAudio = null;
+  el.bgmPreviewBtn.addEventListener('click', () => {
+    const url = el.bgmUrl.value.trim();
+    if (!url) { toast('请先输入 BGM URL', true); return; }
+    if (bgmPreviewAudio) { bgmPreviewAudio.pause(); bgmPreviewAudio = null; el.bgmPreviewBtn.textContent = '试听'; return; }
+    bgmPreviewAudio = new Audio(url);
+    bgmPreviewAudio.volume = +el.bgmVolume.value;
+    bgmPreviewAudio.loop = el.bgmLoop.checked;
+    bgmPreviewAudio.play().catch(e => toast('播放失败: ' + e.message, true));
+    el.bgmPreviewBtn.textContent = '停止';
+    bgmPreviewAudio.addEventListener('ended', () => { bgmPreviewAudio = null; el.bgmPreviewBtn.textContent = '试听'; });
+  });
+
   el.loadingBg.addEventListener('input', () => {
     if (!sceneData.config) sceneData.config = {};
     sceneData.config.loadingBg = el.loadingBg.value.trim();
@@ -657,6 +680,11 @@ function syncToUI() {
   el.gridRows.value = sceneData.config.grid.rows;
   el.kolId.value = sceneData.config.kolId || '';
   el.loadingBg.value = sceneData.config.loadingBg || '';
+  const bgm = sceneData.config.bgm || {};
+  el.bgmUrl.value = bgm.url || '';
+  el.bgmVolume.value = bgm.volume ?? 0.5;
+  el.bgmVolVal.textContent = el.bgmVolume.value;
+  el.bgmLoop.checked = bgm.loop !== false;
   renderResources();
   renderStates();
   updateInitialSelect();
