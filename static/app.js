@@ -2197,14 +2197,29 @@ function openCharGenerator() {
       area.innerHTML = simple ? '<div style="font-size:11px;color:var(--text-muted);padding:4px 0">当前无简易模式选项。<a href="/gen-options.html" target="_blank">去管理页面设置</a></div>' : '';
       return;
     }
-    area.innerHTML = visible.map(g =>
-      `<div class="char-field" style="margin-bottom:6px">` +
-      `<label>${escapeHtml(g.label_zh || g.label)}</label>` +
-      `<select class="gen-opt-select" data-key="${escapeHtml(g.key)}" style="width:100%;padding:4px 8px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">` +
-      `<option value="">-- 不指定 --</option>` +
-      g.options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.display)}</option>`).join("") +
-      `</select></div>`
-    ).join("");
+    area.innerHTML = visible.map(g => {
+      const labelText = escapeHtml(g.label_zh || g.label) + (g.multi ? ' <span style="font-size:10px;color:var(--accent)">(多选)</span>' : '');
+      if (g.multi) {
+        // 多选：复选框列表
+        return `<div class="char-field" style="margin-bottom:6px">` +
+          `<label>${labelText}</label>` +
+          `<div class="gen-opt-multi" data-key="${escapeHtml(g.key)}" style="display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--border);border-radius:4px;max-height:140px;overflow-y:auto">` +
+          g.options.map(o =>
+            `<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:3px;cursor:pointer">` +
+            `<input type="checkbox" class="gen-opt-check" value="${escapeHtml(o.value)}" style="margin:0;cursor:pointer">` +
+            `<span>${escapeHtml(o.display)}</span>` +
+            `</label>`
+          ).join("") +
+          `</div></div>`;
+      }
+      // 单选：下拉框
+      return `<div class="char-field" style="margin-bottom:6px">` +
+        `<label>${labelText}</label>` +
+        `<select class="gen-opt-select" data-key="${escapeHtml(g.key)}" style="width:100%;padding:4px 8px;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">` +
+        `<option value="">-- 不指定 --</option>` +
+        g.options.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.display)}</option>`).join("") +
+        `</select></div>`;
+    }).join("");
   }
 
   (async () => {
@@ -2222,8 +2237,14 @@ function openCharGenerator() {
 
   function collectGenSelections() {
     const sels = {};
+    // 单选
     document.querySelectorAll(".gen-opt-select").forEach(sel => {
       if (sel.value) sels[sel.dataset.key] = sel.value;
+    });
+    // 多选：收集勾选的 checkbox 为数组
+    document.querySelectorAll(".gen-opt-multi").forEach(box => {
+      const picked = [...box.querySelectorAll(".gen-opt-check:checked")].map(c => c.value);
+      if (picked.length) sels[box.dataset.key] = picked;
     });
     return sels;
   }

@@ -434,10 +434,24 @@ async def delete_gen_option_group(key: str):
 
 
 def _build_gen_supplement(selections: dict) -> str:
-    """将前端传来的下拉选择 {key: value} 拼装为补充设定文本。"""
+    """将前端传来的下拉选择 {key: value | [value...]} 拼装为补充设定文本。
+
+    支持：
+    - 单选：value 为字符串 → "key: value"
+    - 多选：value 为数组 → "key: v1, v2, v3"
+    """
     if not selections:
         return ""
-    parts = [f"{k}: {v}" for k, v in selections.items() if v]
+    parts = []
+    for k, v in selections.items():
+        if not v:
+            continue
+        if isinstance(v, list):
+            vals = [str(x) for x in v if x]
+            if vals:
+                parts.append(f"{k}: {', '.join(vals)}")
+        else:
+            parts.append(f"{k}: {v}")
     return "\n".join(parts)
 
 

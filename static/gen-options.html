@@ -36,6 +36,9 @@
     .simple-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500}
     .simple-badge.on{background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.3)}
     .simple-badge.off{background:rgba(139,148,158,.1);color:var(--text-muted);border:1px solid var(--border)}
+    .multi-badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500}
+    .multi-badge.on{background:rgba(88,166,255,.15);color:var(--accent);border:1px solid rgba(88,166,255,.3)}
+    .multi-badge.off{background:rgba(139,148,158,.1);color:var(--text-muted);border:1px solid var(--border)}
 
     .group-body{padding:12px 16px}
 
@@ -132,8 +135,10 @@ function render() {
         <span class="key">${esc(g.key)}</span>
         <span class="label">${esc(g.label)}<span class="label-zh">${esc(g.label_zh || '')}</span></span>
         <span class="simple-badge ${g.simple ? 'on' : 'off'}">${g.simple ? '✓ 简易模式' : '— 仅完整模式'}</span>
+        <span class="multi-badge ${g.multi ? 'on' : 'off'}">${g.multi ? '☑ 多选' : '○ 单选'}</span>
         <div class="actions">
           <button class="btn-sm" onclick="toggleSimple(${gi})" title="切换简易模式">${g.simple ? '关闭简易' : '启用简易'}</button>
+          <button class="btn-sm" onclick="toggleMulti(${gi})" title="切换多选">${g.multi ? '改为单选' : '改为多选'}</button>
           <button class="btn-sm" onclick="editGroup(${gi})">编辑</button>
           <button class="btn-sm danger" onclick="deleteGroup(${gi})">删除</button>
         </div>
@@ -179,6 +184,12 @@ async function save() {
 
 async function toggleSimple(gi) {
   groups[gi].simple = !groups[gi].simple;
+  await save();
+  render();
+}
+
+async function toggleMulti(gi) {
+  groups[gi].multi = !groups[gi].multi;
   await save();
   render();
 }
@@ -243,7 +254,7 @@ document.getElementById("btn-add-group").addEventListener("click", () => {
   ], async (vals) => {
     if (!vals.key || !vals.label) { alert("Key 和 Label 不能为空"); return false; }
     if (groups.some(g => g.key === vals.key)) { alert("Key 已存在"); return false; }
-    groups.push({ key: vals.key, label: vals.label, label_zh: vals.label_zh, simple: false, options: [] });
+    groups.push({ key: vals.key, label: vals.label, label_zh: vals.label_zh, simple: false, multi: false, options: [] });
     await save();
     render();
     return true;
