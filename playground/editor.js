@@ -365,8 +365,9 @@ function renderStates() {
       s.require_pay ? '<span class="tag pay">💰付费</span>' : '',
     ].join('');
 
-    return `<div class="state-card open${isInit ? ' is-initial' : ''}" data-state="${esc(id)}">
+    return `<div class="state-card open${isInit ? ' is-initial' : ''}" data-state="${esc(id)}" draggable="true">
       <div class="state-header" onclick="toggleCard(this)">
+        <span class="drag-handle" title="拖动排序">⋮⋮</span>
         <span class="state-id-display">${esc(id)}</span>
         <span class="state-badges">${tags}</span>
         <span class="state-collapse">▸</span>
@@ -436,6 +437,64 @@ function renderStates() {
       </div>
     </div>`;
   }).join('');
+
+  bindStateDragAndDrop();
+}
+
+// ── 状态拖动排序 ──────────────────────────────────────────
+let _draggingStateId = null;
+
+function bindStateDragAndDrop() {
+  const cards = el.stateList.querySelectorAll('.state-card');
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      _draggingStateId = card.dataset.state;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      // 防止 Firefox 不触发 drag
+      try { e.dataTransfer.setData('text/plain', _draggingStateId); } catch (_) {}
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      el.stateList.querySelectorAll('.state-card').forEach(c => c.classList.remove('drag-over'));
+      _draggingStateId = null;
+    });
+    card.addEventListener('dragover', (e) => {
+      if (!_draggingStateId || card.dataset.state === _draggingStateId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      // 根据鼠标位置判断放在前面还是后面
+      const rect = card.getBoundingClientRect();
+      const isAfter = (e.clientY - rect.top) > rect.height / 2;
+      card.classList.remove('drag-over-top', 'drag-over-bottom');
+      card.classList.add(isAfter ? 'drag-over-bottom' : 'drag-over-top');
+    });
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const fromId = _draggingStateId;
+      const toId = card.dataset.state;
+      card.classList.remove('drag-over-top', 'drag-over-bottom');
+      if (!fromId || fromId === toId) return;
+
+      const rect = card.getBoundingClientRect();
+      const isAfter = (e.clientY - rect.top) > rect.height / 2;
+
+      // 在 stateOrder 中挪动位置
+      const fromIdx = stateOrder.indexOf(fromId);
+      if (fromIdx < 0) return;
+      stateOrder.splice(fromIdx, 1);
+      let toIdx = stateOrder.indexOf(toId);
+      if (isAfter) toIdx += 1;
+      stateOrder.splice(toIdx, 0, fromId);
+
+      markDirty();
+      renderStates();
+      updateInitialSelect();
+    });
+  });
 }
 
 function resourceOptions(selected) {
