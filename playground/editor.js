@@ -160,8 +160,22 @@ async function selectScene(name) {
   updateSaveBtn();
 }
 
+// 按 stateOrder 重排 sceneData.states 对象的键序
+function reorderStatesByOrder() {
+  const reordered = {};
+  for (const id of stateOrder) {
+    if (sceneData.states[id]) reordered[id] = sceneData.states[id];
+  }
+  // 兜底：任何 stateOrder 没覆盖到的 key 追加在最后
+  for (const id of Object.keys(sceneData.states)) {
+    if (!(id in reordered)) reordered[id] = sceneData.states[id];
+  }
+  sceneData.states = reordered;
+}
+
 async function saveScene() {
   if (!currentScene) return;
+  reorderStatesByOrder();
   try {
     await api('PUT', `/api/playground/scenes/${encodeURIComponent(currentScene)}/data`, sceneData);
     dirty = false;
@@ -799,6 +813,7 @@ function updateSaveBtn() {
 
 function downloadSceneJson() {
   if (!currentScene) return;
+  reorderStatesByOrder();
   const json = JSON.stringify(sceneData, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const a = document.createElement('a');
