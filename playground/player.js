@@ -395,7 +395,14 @@ class InteractivePlayer {
     if (state.on_click) {
       state.on_click.forEach((a, i) => {
         const tag = ['🟢', '🔵', '🟡'][i % 3];
-        const r = a.regions === '*' ? '*' : `rows${JSON.stringify(a.regions.rows)} cols${JSON.stringify(a.regions.cols)}`;
+        let r;
+        if (a.regions === '*') {
+          r = '*';
+        } else if (Array.isArray(a.regions)) {
+          r = `cells${JSON.stringify(a.regions)}`;
+        } else {
+          r = `rows${JSON.stringify(a.regions.rows)} cols${JSON.stringify(a.regions.cols)}`;
+        }
         lines.push(`${tag} ${r} → ${a.target}`);
       });
     }
