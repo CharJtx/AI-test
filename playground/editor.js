@@ -230,6 +230,9 @@ function renderResources() {
     const id = Object.entries(sceneData.resources).find(([, fn]) => fn === r.name)?.[0] || '';
     const displayName = isUrl ? (r.name.length > 50 ? r.name.slice(0, 50) + '…' : r.name) : r.name;
     const sizeText = isUrl ? '<span class="res-size url-badge">URL</span>' : `<span class="res-size">${fmtSize(r.size)}</span>`;
+    const dlBtn = isUrl
+      ? `<button class="res-dl" onclick="downloadUrlResource('${esc(r.name)}')" title="下载">⬇</button>`
+      : '';
     const delBtn = isUrl
       ? `<button class="res-del" onclick="removeUrlResource('${esc(r.name)}')" title="移除">×</button>`
       : `<button class="res-del" onclick="deleteResource('${esc(r.name)}')" title="删除">×</button>`;
@@ -238,9 +241,21 @@ function renderResources() {
         data-filename="${esc(r.name)}" onchange="renameResource(this)">
       <span class="res-name" title="${esc(r.name)}">${esc(displayName)}</span>
       ${sizeText}
+      ${dlBtn}
       ${delBtn}
     </div>`;
   }).join('');
+}
+
+function downloadUrlResource(url) {
+  // 走后端代理下载，绕过浏览器 CORS + 强制触发 attachment
+  const proxyUrl = `/api/playground/proxy-download?url=${encodeURIComponent(url)}`;
+  const a = document.createElement('a');
+  a.href = proxyUrl;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function removeUrlResource(url) {

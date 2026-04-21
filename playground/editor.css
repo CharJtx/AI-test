@@ -80,6 +80,8 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .res-item .res-size { color: #52525b; font-size: 11px; white-space: nowrap; }
 .res-item .res-del { background: none; border: none; color: #52525b; cursor: pointer; font-size: 14px; padding: 0 2px; }
 .res-item .res-del:hover { color: #f87171; }
+.res-item .res-dl { background: none; border: none; color: #52525b; cursor: pointer; font-size: 13px; padding: 0 2px; }
+.res-item .res-dl:hover { color: #60a5fa; }
 
 /* ── State List ── */
 .section-header {

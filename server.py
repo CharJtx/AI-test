@@ -3502,6 +3502,34 @@ async def delete_scene_resource(name: str, filename: str = Query(...)):
     return JSONResponse({"error": "file not found"}, status_code=404)
 
 
+@app.get("/api/playground/proxy-download")
+async def proxy_download_url(url: str = Query(...)):
+    """代理下载远程 URL 资源，绕过浏览器 CORS 限制。
+    后端 → 拉取远程 URL → 流式回传给浏览器，带 Content-Disposition: attachment。
+    """
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return JSONResponse({"error": "invalid URL"}, status_code=400)
+
+    # 从 URL 路径提取默认文件名
+    from urllib.parse import urlparse, unquote, quote as url_quote
+    parsed = urlparse(url)
+    fname = unquote(parsed.path.rsplit("/", 1)[-1]) or "download.bin"
+
+    async def stream_bytes():
+        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+            async with client.stream("GET", url) as resp:
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+
+    # 使用 RFC 5987 UTF-8 编码处理文件名（兼容中文等非 ASCII）
+    safe_name = url_quote(fname, safe="")
+    headers = {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}",
+    }
+    # 尝试转发原始 Content-Type（可选，流式模式下提前不知道）
+    return StreamingResponse(stream_bytes(), media_type="application/octet-stream", headers=headers)
+
+
 # ── InSnap API 代理 ────────────────────────────────────────
 # 代理转发前端请求到 InSnap 外部 API，避免浏览器 CORS 限制。
 # 配置项通过 .env 中的 INSNAP_API_URL 和 INSNAP_API_KEY 提供。
