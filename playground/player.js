@@ -45,7 +45,7 @@ class InteractivePlayer {
       const video = document.createElement('video');
       video.playsInline = true;
       video.preload = 'auto';
-      video.crossOrigin = 'anonymous';
+      // 不设 crossOrigin：播放不需要 CORS 校验，设了反而会被没配 CORS 头的 CDN 拦截
       // 完整 URL 直接使用，本地文件拼接 baseUrl
       const isFullUrl = filename.startsWith('http://') || filename.startsWith('https://');
       video.src = isFullUrl ? filename : this.baseUrl + encodeURIComponent(filename);
