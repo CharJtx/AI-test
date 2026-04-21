@@ -37,6 +37,7 @@ const el = {
   initialState: $('#initial-state'),
   stateList:    $('#state-list'),
   btnAddState:  $('#btn-add-state'),
+  btnToggleAll: $('#btn-toggle-all'),
   btnDownloadJson: $('#btn-download-json'),
   toast:        $('#toast'),
 };
@@ -60,6 +61,7 @@ function bindEvents() {
   el.btnSave.addEventListener('click', saveScene);
   el.btnDownloadJson.addEventListener('click', downloadSceneJson);
   el.btnAddState.addEventListener('click', () => addState());
+  el.btnToggleAll.addEventListener('click', toggleAllStates);
 
   el.gridCols.addEventListener('change', () => { sceneData.config.grid.cols = +el.gridCols.value; markDirty(); });
   el.gridRows.addEventListener('change', () => { sceneData.config.grid.rows = +el.gridRows.value; markDirty(); });
@@ -761,6 +763,15 @@ function handleRename(input, oldId) {
 
 function toggleCard(header) {
   header.parentElement.classList.toggle('open');
+}
+
+function toggleAllStates() {
+  const cards = el.stateList.querySelectorAll('.state-card');
+  if (!cards.length) return;
+  // 如果有任何一张开着 → 全部收起；否则全部展开
+  const anyOpen = [...cards].some(c => c.classList.contains('open'));
+  cards.forEach(c => c.classList.toggle('open', !anyOpen));
+  el.btnToggleAll.textContent = anyOpen ? '全部展开' : '全部收起';
 }
 
 function syncToUI() {
