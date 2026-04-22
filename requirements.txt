@@ -5,10 +5,17 @@ websockets>=14.0
 python-dotenv>=1.0.0
 Pillow>=10.0.0
 python-multipart>=0.0.9
+pyyaml>=6.0
 
-# ── Skill system / fast-lane RAG (optional for app runtime; required on the
-#    server that hosts /api/skills/{id}/chat and on the machine that builds
-#    a skill bundle with tools/distill_fast/)
-sentence-transformers>=3.0.0
-sqlite-vec>=0.1.6
-numpy>=1.26
+# pydantic is already pulled in by fastapi — used by tools/distill_instant/
+# schemas and services/skill_inference.
+#
+# Intentionally NOT listed here (would bloat the app image with ~3GB of CUDA
+# wheels via torch):
+#   sentence-transformers, torch, sqlite-vec, numpy, faster-whisper, yt-dlp
+# These are only needed by tools/distill_fast/ which runs in its own
+# dedicated docker images (tools/distill_fast/docker/Dockerfile.{embed,transcribe}).
+# retrieve.py imports sentence_transformers / sqlite_vec lazily inside
+# function bodies, so the app module is importable without them — RAG will
+# only activate if a skill has a knowledge/ index AND those extras are
+# pip-installed in the runtime.
