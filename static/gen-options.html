@@ -139,6 +139,7 @@ function render() {
         <div class="actions">
           <button class="btn-sm" onclick="toggleSimple(${gi})" title="切换简易模式">${g.simple ? '关闭简易' : '启用简易'}</button>
           <button class="btn-sm" onclick="toggleMulti(${gi})" title="切换多选">${g.multi ? '改为单选' : '改为多选'}</button>
+          <button class="btn-sm" onclick="importCsv(${gi})" title="从 CSV 批量导入">📂 CSV</button>
           <button class="btn-sm" onclick="editGroup(${gi})">编辑</button>
           <button class="btn-sm danger" onclick="deleteGroup(${gi})">删除</button>
         </div>
@@ -192,6 +193,44 @@ async function toggleMulti(gi) {
   groups[gi].multi = !groups[gi].multi;
   await save();
   render();
+}
+
+function importCsv(gi) {
+  const group = groups[gi];
+  const key = group.key;
+  const mode = confirm(
+    `从 CSV 导入选项到「${group.label}」\n\n` +
+    `CSV 格式：第1行为表头，后续每行两列：显示文本, 值\n\n` +
+    `点击「确定」= 追加模式（已有选项保留，display 重复则覆盖）\n` +
+    `点击「取消」= 替换模式（先清空所有选项再导入）`
+  ) ? "append" : "replace";
+
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".csv,text/csv";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("mode", mode);
+    try {
+      const resp = await fetch(`/api/gen-options/${encodeURIComponent(key)}/import-csv`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        alert("导入失败: " + (data.error || resp.statusText));
+        return;
+      }
+      alert(`导入成功！\n新增 ${data.imported} 条，当前总计 ${data.total} 条。`);
+      await load();  // 重新加载并渲染
+    } catch (e) {
+      alert("导入失败: " + e.message);
+    }
+  };
+  input.click();
 }
 
 async function deleteGroup(gi) {

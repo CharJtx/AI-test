@@ -425,6 +425,71 @@ async def update_gen_option_group(key: str, request: Request):
     return JSONResponse({"error": "group not found"}, status_code=404)
 
 
+@app.post("/api/gen-options/{key}/import-csv")
+async def import_gen_option_csv(key: str, file: UploadFile = File(...), mode: str = Form("append")):
+    """
+    从 CSV 文件批量导入选项到指定选项组。
+
+    CSV 格式：第1行表头（跳过），第2行起每行两列：display, value
+    - display: 选项显示文本（如中文名）
+    - value: 注入到 LLM 的文本（可以是描述句或简短标签）
+
+    查询参数：
+    - mode: "append"（追加，默认，去重）| "replace"（全部替换）
+    """
+    groups = _load_gen_options()
+    target = next((g for g in groups if g["key"] == key), None)
+    if not target:
+        return JSONResponse({"error": "group not found"}, status_code=404)
+
+    raw = await file.read()
+
+    # 尝试多种编码解码
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "gb18030", "gbk", "big5"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        return JSONResponse({"error": "无法识别 CSV 编码（尝试了 UTF-8/GBK/GB18030/Big5）"}, status_code=400)
+
+    # 用 csv 库正确处理引号包裹的值（含逗号/换行）
+    import csv as _csv
+    from io import StringIO
+    reader = _csv.reader(StringIO(text))
+    rows = list(reader)
+    if not rows:
+        return JSONResponse({"error": "CSV 为空"}, status_code=400)
+
+    # 第1行作为表头跳过
+    data_rows = rows[1:] if len(rows) > 1 else []
+
+    new_options = []
+    for row in data_rows:
+        if not row or not row[0].strip():
+            continue
+        display = row[0].strip()
+        value = row[1].strip() if len(row) > 1 and row[1].strip() else display
+        new_options.append({"display": display, "value": value})
+
+    if not new_options:
+        return JSONResponse({"error": "CSV 中未找到有效数据行"}, status_code=400)
+
+    if mode == "replace":
+        target["options"] = new_options
+    else:
+        # 追加 + 按 display 去重（已存在的用新数据覆盖）
+        existing = {o["display"]: o for o in target.get("options", [])}
+        for opt in new_options:
+            existing[opt["display"]] = opt
+        target["options"] = list(existing.values())
+
+    _save_gen_options(groups)
+    return {"ok": True, "imported": len(new_options), "total": len(target["options"])}
+
+
 @app.delete("/api/gen-options/{key}")
 async def delete_gen_option_group(key: str):
     """删除一个选项组。"""
