@@ -1,0 +1,19 @@
+# Source manifest for Elon Musk skill (internal POC only)
+# Used by: python -m tools.distill_fast transcribe --creator elon-musk --source sources.yaml
+
+creator_handle: "@elonmusk"
+language: en
+
+# Start small — 2-3 recent episodes is enough to validate the RAG pipeline.
+# Add more after the smoke test passes.
+youtube:
+  - url: https://www.youtube.com/watch?v=JN3KPFbWCy8
+    title: "Lex Fridman Podcast #400 — Elon Musk: War, AI, Aliens..."
+    keep_speakers: null  # keep all (diarization handled downstream)
+  - url: https://www.youtube.com/watch?v=_5DwlvtJ6sM
+    title: "All-In Podcast — Elon on X, Grok, Mars (2024)"
+  # - add more episodes here; each adds ~1-3 min transcribe time per hour of audio
+
+# Optional: a JSONL of the creator's own posts (tweets, each line: {id, created_at, text}).
+# Leave empty / delete if you don't have one.
+# tweets_file: work/ingest/elon-musk/tweets.jsonl

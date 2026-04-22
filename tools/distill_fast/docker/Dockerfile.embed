@@ -1,0 +1,30 @@
+# Self-contained embed image: bge-m3 via sentence-transformers + sqlite-vec.
+#
+# We run this on the server with one GPU (bge-m3 on CPU works, ~10x slower —
+# enable --device cpu fallback in embed_build.py if you ever need it).
+#
+# Pinned versions — bump together after testing.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HUB_ENABLE_HF_TRANSFER=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip ca-certificates git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Torch 2.4 is the last release to build against CUDA 12.4 wheels on
+# Python 3.10. sentence-transformers 3.x handles bge-m3 natively.
+RUN pip3 install --no-cache-dir \
+      "torch==2.4.1" --index-url https://download.pytorch.org/whl/cu124
+
+RUN pip3 install --no-cache-dir \
+      "sentence-transformers==3.3.1" \
+      "transformers==4.46.3" \
+      "sqlite-vec==0.1.6" \
+      "huggingface_hub[hf_transfer]==0.28.1" \
+      "numpy<2"
+
+WORKDIR /work

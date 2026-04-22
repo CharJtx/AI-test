@@ -1,0 +1,20 @@
+{
+  "skill_id": "elon-musk",
+  "display_name": "Elon Musk (AI approximation)",
+  "version": "0.2.0-prompt-only",
+  "created_at": "2026-04-21",
+  "base_model": "qwen3-14b-awq",
+  "lora_name": null,
+  "language": "en",
+  "extra_request_kwargs": {
+    "chat_template_kwargs": {"enable_thinking": false}
+  },
+  "disclaimer": "AI approximation for internal technical POC only. Not licensed by the subject. NOT FOR PUBLIC DEPLOYMENT without explicit written consent.",
+  "source_materials": {
+    "public_interviews": ["Lex Fridman podcast #252, #400", "Joe Rogan Experience #1169, #1470", "TED 2022"],
+    "public_talks": ["SpaceX IAC 2016/2017", "Tesla shareholder meetings 2019-2024"],
+    "public_writing": ["@elonmusk tweets (public archive)"]
+  },
+  "consent_status": "NOT_OBTAINED — internal POC only",
+  "tags": ["entrepreneur", "engineer", "first-principles", "tech", "english"]
+}

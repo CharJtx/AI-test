@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Skill 创建 — 5 问生成草稿</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* Page-specific styles using the shared design tokens from style.css */
+  .skill-main { max-width: 1080px; margin: 0 auto; padding: 20px; }
+  .skill-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 860px) { .skill-grid { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .panel h3 { margin: 0 0 4px; font-size: 14px; color: var(--text); font-weight: 600; }
+  .panel .hint { color: var(--text-muted); font-size: 11px; margin-bottom: 10px; }
+  .field-label { display: block; font-size: 11px; color: var(--text-muted); margin: 8px 0 4px; }
+  .field-input, .field-textarea, .field-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.5;
+  }
+  .field-input:focus, .field-textarea:focus, .field-select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .field-textarea { resize: vertical; min-height: 60px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > * { flex: 1; }
+  .field-row > .compact { flex: 0 0 130px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.on { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+  .chip-add {
+    width: auto; min-width: 120px;
+    padding: 3px 10px; font-size: 11px; border-radius: 999px;
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+  }
+
+  .toolbar {
+    display: flex; gap: 10px; align-items: center;
+    margin-top: 16px;
+  }
+  .btn-primary {
+    background: var(--accent); color: #0d1117;
+    border: none; border-radius: var(--radius);
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); padding: 6px 12px;
+    font-size: 12px; border-radius: var(--radius); cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .status { color: var(--text-muted); font-size: 12px; }
+  .status.ok { color: #6ecb63; }
+  .status.err { color: #f08383; }
+
+  .result { margin-top: 18px; display: none; }
+  .result.visible { display: block; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+  .tab {
+    padding: 7px 12px; cursor: pointer; font-size: 12px;
+    color: var(--text-muted); border-bottom: 2px solid transparent;
+  }
+  .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .pane {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 440px; overflow: auto;
+  }
+
+  .chat { margin-top: 18px; display: none; }
+  .chat.visible { display: block; }
+  .thread {
+    display: flex; flex-direction: column; gap: 8px;
+    min-height: 80px; max-height: 380px; overflow: auto; padding: 6px 0;
+  }
+  .bubble {
+    max-width: 78%; padding: 9px 12px; border-radius: 14px;
+    font-size: 13px; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .bubble.user {
+    align-self: flex-end; background: var(--accent); color: #0d1117;
+  }
+  .bubble.assistant {
+    align-self: flex-start; background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+  .inputbar { display: flex; gap: 8px; margin-top: 10px; }
+  .inputbar input { flex: 1; }
+
+  .legal {
+    margin-top: 14px; padding: 9px 12px;
+    border: 1px solid #8b6d2f;
+    border-radius: var(--radius);
+    background: rgba(229, 192, 123, 0.08);
+    color: #e5c07b;
+    font-size: 11px; line-height: 1.55;
+  }
+  .legal code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+
+<!-- 顶部栏 (匹配主站) -->
+<header>
+  <h1>Skill 创建</h1>
+  <div class="header-actions">
+    <span class="status" id="backend-status">API: llm.insnaplive.com</span>
+    <a href="/" class="btn-ghost" style="text-decoration:none">← 回主页</a>
+  </div>
+</header>
+
+<main class="skill-main">
+
+  <div class="panel" style="margin-bottom:16px">
+    <h3>Q1. 这是谁？</h3>
+    <div class="hint">名字 + 2-3 句话的简介。这是唯一的必填字段组。</div>
+    <div class="field-row">
+      <div>
+        <label class="field-label">Display name</label>
+        <input id="f-name" class="field-input" type="text" placeholder="Anthony Bourdain" />
+      </div>
+      <div>
+        <label class="field-label">Slug (自动从名字生成)</label>
+        <input id="f-slug" class="field-input" type="text" placeholder="anthony-bourdain" />
+      </div>
+      <div class="compact">
+        <label class="field-label">Language</label>
+        <select id="f-lang" class="field-select">
+          <option value="en" selected>en</option>
+          <option value="zh-CN">zh-CN</option>
+          <option value="ja">ja</option>
+          <option value="es">es</option>
+          <option value="fr">fr</option>
+        </select>
+      </div>
+    </div>
+    <label class="field-label">简介 (2-3 句话)</label>
+    <textarea id="f-brief" class="field-textarea" rows="3" placeholder="American chef, writer, and travel documentarian. Hosted Parts Unknown."></textarea>
+  </div>
+
+  <div class="skill-grid">
+
+    <div class="panel">
+      <h3>Q2. 他们最常聊什么？</h3>
+      <div class="hint">多选 2-5 个领域</div>
+      <div class="chips" data-field="primary_domains"></div>
+      <input class="chip-add" type="text" data-target="primary_domains" placeholder="+ 自定义 (Enter)" />
+    </div>
+
+    <div class="panel">
+      <h3>Q3. 说话风格？</h3>
+      <div class="hint">多选 2-5 个语体标签</div>
+      <div class="chips" data-field="speech_register"></div>
+      <input class="chip-add" type="text" data-target="speech_register" placeholder="+ 自定义 (Enter)" />
+    </div>
+
+    <div class="panel" style="grid-column: 1 / -1">
+      <h3>Q4. 有什么口头禅？ <span style="color:var(--text-muted); font-weight:normal; font-size:11px">(可选, 但 ROI 最高)</span></h3>
+      <div class="hint">一行一条。这些会被 verbatim 嵌入人设。</div>
+      <textarea id="f-catchphrases" class="field-textarea" rows="3" placeholder="your body is an amusement park&#10;if I'm an advocate for anything, it's to move"></textarea>
+    </div>
+
+    <div class="panel" style="grid-column: 1 / -1">
+      <h3>Q5. 回避哪些话题？</h3>
+      <div class="hint">用于 Layer 5 边界。医疗/法律/金融默认已加。</div>
+      <div class="chips" data-field="topics_to_avoid"></div>
+      <input class="chip-add" type="text" data-target="topics_to_avoid" placeholder="+ 自定义 (Enter)" />
+    </div>
+
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-primary" id="btn-generate">生成草稿</button>
+    <button class="btn-ghost" id="btn-sample">填入示例 (Bourdain)</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="legal">
+    ⚠ 本页生成的 skill 一律标记 <code>consent_status = "DRAFT — awaiting contract"</code>。
+    在任何国际商用发布前必须完成签约、合规流程。这是测试页，不是上线通道。
+  </div>
+
+  <section class="result" id="result">
+    <div class="tabs">
+      <div class="tab on" data-tab="meta">meta.json</div>
+      <div class="tab" data-tab="persona">persona.md</div>
+      <div class="tab" data-tab="skill">skill.md (运行时)</div>
+    </div>
+    <div id="pane-meta" class="pane"></div>
+    <div id="pane-persona" class="pane" style="display:none"></div>
+    <div id="pane-skill" class="pane" style="display:none"></div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn-ghost" id="btn-dl-meta">下载 meta.json</button>
+      <button class="btn-ghost" id="btn-dl-persona">下载 persona.md</button>
+      <button class="btn-ghost" id="btn-dl-skill">下载 skill.md</button>
+    </div>
+  </section>
+
+  <section class="chat" id="chat">
+    <div class="panel">
+      <h3>用生成的 skill 试聊</h3>
+      <div class="hint">直接用本页生成的 skill.md 作为 system prompt 发起对话。</div>
+      <div class="thread" id="thread"></div>
+      <div class="inputbar">
+        <input id="chat-input" class="field-input" type="text" placeholder="问点啥…" />
+        <button class="btn-primary" id="btn-send">发送</button>
+        <button class="btn-ghost" id="btn-reset-chat">清空</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   Config: the vLLM endpoint (OpenAI-compatible) served on port 8080.
+   ════════════════════════════════════════════════════════════════ */
+const LLM_BASE = "https://llm.insnaplive.com/v1";
+const LLM_MODEL = "qwen3-14b-awq";
+
+/* ════════════════════════════════════════════════════════════════
+   Vibe-chip vocabularies
+   ════════════════════════════════════════════════════════════════ */
+const CHIPS = {
+  primary_domains: [
+    "tech", "AI", "engineering", "space", "product-design", "food", "travel",
+    "writing", "gaming", "fitness", "philosophy", "history", "art", "music",
+    "finance", "education", "science", "comedy", "sports", "fashion", "health",
+  ],
+  speech_register: [
+    "warm", "blunt", "dry-humor", "sincere", "theatrical", "sardonic", "mellow",
+    "intense", "first-principles", "poetic", "declarative", "nerdy",
+    "streetwise", "soft-spoken", "high-energy", "low-key", "professorial",
+    "playful", "irreverent", "gruff", "literary",
+  ],
+  topics_to_avoid: [
+    "active-litigation", "medical-specifics", "personal-family",
+    "political-endorsements", "financial-advice", "celebrity-gossip",
+    "unverified-claims", "NSFW",
+  ],
+};
+const selected = {
+  primary_domains: new Set(),
+  speech_register: new Set(),
+  topics_to_avoid: new Set(),
+};
+
+function slugify(s) {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "";
+}
+function renderChips(field) {
+  const host = document.querySelector(`.chips[data-field="${field}"]`);
+  host.innerHTML = "";
+  const all = new Set([...CHIPS[field], ...selected[field]]);
+  for (const tag of all) {
+    const el = document.createElement("span");
+    el.className = "chip" + (selected[field].has(tag) ? " on" : "");
+    el.textContent = tag;
+    el.onclick = () => {
+      if (selected[field].has(tag)) selected[field].delete(tag);
+      else selected[field].add(tag);
+      renderChips(field);
+    };
+    host.appendChild(el);
+  }
+}
+for (const f of Object.keys(CHIPS)) renderChips(f);
+document.querySelectorAll(".chip-add").forEach(input => {
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const field = input.dataset.target;
+    const v = input.value.trim();
+    if (v) { selected[field].add(v); renderChips(field); input.value = ""; }
+  });
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Auto-slug from name
+   ════════════════════════════════════════════════════════════════ */
+const nameEl = document.getElementById("f-name");
+const slugEl = document.getElementById("f-slug");
+let slugTouched = false;
+slugEl.addEventListener("input", () => { slugTouched = true; });
+nameEl.addEventListener("input", () => {
+  if (!slugTouched) slugEl.value = slugify(nameEl.value);
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Sample filler
+   ════════════════════════════════════════════════════════════════ */
+document.getElementById("btn-sample").onclick = () => {
+  nameEl.value = "Anthony Bourdain";
+  slugEl.value = "anthony-bourdain"; slugTouched = true;
+  document.getElementById("f-lang").value = "en";
+  document.getElementById("f-brief").value =
+    "American chef, writer, and travel documentarian. Hosted \"Parts Unknown\". Passed in 2018 — historical persona approximation only.";
+  selected.primary_domains = new Set(["food", "travel", "writing"]);
+  selected.speech_register = new Set(["gruff", "literary", "dry-humor", "irreverent"]);
+  selected.topics_to_avoid = new Set(["personal-family", "medical-specifics"]);
+  for (const f of Object.keys(CHIPS)) renderChips(f);
+  document.getElementById("f-catchphrases").value =
+    "your body is an amusement park\nif I'm an advocate for anything, it's to move";
+};
+
+/* ════════════════════════════════════════════════════════════════
+   JSON Schema (mirror of tools/distill_instant/schema.py DraftPersonaJSON).
+   vLLM supports OpenAI response_format: {type:"json_schema", json_schema:{...}}
+   so we pass this directly — no server middleware needed.
+   ════════════════════════════════════════════════════════════════ */
+const DRAFT_PERSONA_SCHEMA = {
+  name: "DraftPersonaJSON",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "layer_0_hard_rules", "layer_1_identity", "layer_2_expression",
+      "layer_3_decision_logic", "layer_4_interpersonal_protocol",
+      "layer_5_boundaries", "runtime_shorthand",
+    ],
+    properties: {
+      layer_0_hard_rules: {
+        type: "array", items: { type: "string" }, minItems: 4,
+      },
+      layer_1_identity: {
+        type: "object", additionalProperties: false,
+        required: ["full_name","roles","background","recurring_obsessions"],
+        properties: {
+          full_name: { type: "string" },
+          roles: { type: "array", items: { type: "string" } },
+          background: { type: "string" },
+          self_labels: { type: "array", items: { type: "string" } },
+          hero_figures: { type: "array", items: { type: "string" } },
+          recurring_obsessions: { type: "array", items: { type: "string" } },
+        },
+      },
+      layer_2_expression: {
+        type: "object", additionalProperties: false,
+        required: ["pace_and_rhythm","vocabulary","tone","catchphrases"],
+        properties: {
+          pace_and_rhythm: { type: "string" },
+          vocabulary: { type: "string" },
+          tone: { type: "string" },
+          catchphrases: { type: "array", items: { type: "string" } },
+          cultural_references: { type: "array", items: { type: "string" } },
+          tics: { type: "array", items: { type: "string" } },
+          emoji_habits: { type: "string" },
+        },
+      },
+      layer_3_decision_logic: { type: "array", items: { type: "string" } },
+      layer_4_interpersonal_protocol: { type: "array", items: { type: "string" } },
+      layer_5_boundaries: {
+        type: "array",
+        items: {
+          type: "object", additionalProperties: false,
+          required: ["topic","why_avoid","declining_phrase"],
+          properties: {
+            topic: { type: "string" },
+            why_avoid: { type: "string" },
+            declining_phrase: { type: "string" },
+          },
+        },
+      },
+      runtime_shorthand: { type: "string" },
+    },
+  },
+};
+
+/* ════════════════════════════════════════════════════════════════
+   Prompts (ported from tools/distill_instant/prompts.py)
+   ════════════════════════════════════════════════════════════════ */
+const SYSTEM_PROMPT = `You are a persona architect for an AI chat-companion platform. You take a short brief about a real public creator and produce a structured 6-layer persona spec that will be used to condition an LLM to imitate their public conversational voice.
+
+Hard requirements:
+
+1. Every layer must be filled. If the brief is thin on a layer, infer conservatively from public-domain knowledge, but do NOT invent specific biographical facts you are not confident of. Leave a field short rather than fabricate.
+
+2. Layer 0 hard rules are IMPERATIVE INSTRUCTIONS addressed to the AI that will be impersonating this person. Write them in the second person ("Never give medical advice", "Acknowledge being an AI if asked sincerely"). NOT first person ("I am an AI..."). Include at minimum:
+   * refuse medical / legal / financial advice
+   * hedge on forward-looking statements about the creator's companies or ongoing projects
+   * acknowledge being an AI impersonation if asked sincerely
+   * decline to impersonate other named real people
+
+3. Layer 2 catchphrases must be the plain text of the phrase. Do NOT add surrounding quote marks yourself — e.g. write insanely great, not "insanely great".
+
+4. Layer 5 boundaries must include the ACTUAL declining phrases the creator would say (in their voice), not abstractions.
+
+5. runtime_shorthand is a full descriptive paragraph (80-150 words), written in the language specified by the brief's language field, that tells a chat model how to imitate this person in casual 1-4 sentence replies. It describes voice, opening phrases, tone, decision patterns, and when to decline. DO NOT emit just the language code.
+
+Do NOT invent private life details, family information, or undisclosed facts.
+`;
+
+function userPrompt(brief) {
+  const lines = [
+    `Creator: ${brief.display_name} (slug: ${brief.creator_slug})`,
+    `Language for runtime_shorthand: ${brief.language}`,
+    "",
+    "Brief:",
+    brief.brief,
+  ];
+  if (brief.catchphrases && brief.catchphrases.length) {
+    lines.push("");
+    lines.push("Known catchphrases (anchor these in layer 2):");
+    for (const c of brief.catchphrases) lines.push(`  - ${JSON.stringify(c)}`);
+  }
+  if (brief.primary_domains.length) {
+    lines.push(""); lines.push(`Primary domains: ${brief.primary_domains.join(", ")}`);
+  }
+  if (brief.speech_register.length) {
+    lines.push(`Speech register tags: ${brief.speech_register.join(", ")}`);
+  }
+  if (brief.topics_to_avoid.length) {
+    lines.push("");
+    lines.push("Known topics to avoid (put in Layer 5 with actual declining phrases):");
+    for (const t of brief.topics_to_avoid) lines.push(`  - ${t}`);
+  }
+  lines.push("");
+  lines.push("Produce the full DraftPersonaJSON now, following the schema exactly. No prose outside the JSON.");
+  return lines.join("\n");
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Markdown rendering (ported from prompts.py render_persona_md / render_skill_md)
+   ════════════════════════════════════════════════════════════════ */
+function stripQuotes(s) {
+  return String(s).trim().replace(/^["']+|["']+$/g, "").trim();
+}
+function renderPersonaMd(brief, d) {
+  const l1 = d.layer_1_identity, l2 = d.layer_2_expression;
+  const out = [];
+  out.push(`# Persona: ${brief.display_name}`);
+  out.push("");
+  out.push(`_Auto-generated draft (${brief.creator_slug}). Human edits to this file always win at runtime. Must be reviewed by the creator and legal before promoting meta.consent_status to ACTIVE._`);
+  out.push("");
+  out.push("---");
+  out.push("");
+  out.push("## Layer 0 — Hard Rules"); out.push("");
+  for (const r of d.layer_0_hard_rules) out.push(`- ${r}`);
+  out.push("");
+  out.push("## Layer 1 — Identity"); out.push("");
+  out.push(`- **Full name**: ${l1.full_name}`);
+  out.push(`- **Roles**: ${l1.roles.join(", ")}`);
+  out.push(`- **Background**: ${l1.background}`);
+  if (l1.self_labels && l1.self_labels.length)
+    out.push(`- **Self-labels**: ${l1.self_labels.join(", ")}`);
+  if (l1.hero_figures && l1.hero_figures.length)
+    out.push(`- **Heroes / influences**: ${l1.hero_figures.join(", ")}`);
+  out.push(`- **Recurring obsessions**: ${(l1.recurring_obsessions||[]).join(", ")}`);
+  out.push("");
+  out.push("## Layer 2 — Expression Style"); out.push("");
+  out.push(`**Pace & rhythm.** ${l2.pace_and_rhythm}`); out.push("");
+  out.push(`**Vocabulary.** ${l2.vocabulary}`); out.push("");
+  out.push(`**Tone.** ${l2.tone}`); out.push("");
+  out.push("**Catchphrases:**");
+  for (const c of l2.catchphrases) out.push(`- "${stripQuotes(c)}"`);
+  if (l2.cultural_references && l2.cultural_references.length) {
+    out.push(""); out.push("**Cultural references.** " + l2.cultural_references.join(", "));
+  }
+  if (l2.tics && l2.tics.length) {
+    out.push(""); out.push("**Tics.** " + l2.tics.join(", "));
+  }
+  if (l2.emoji_habits) {
+    out.push(""); out.push(`**Emoji.** ${l2.emoji_habits}`);
+  }
+  out.push("");
+  out.push("## Layer 3 — Decision Logic"); out.push("");
+  for (const r of d.layer_3_decision_logic) out.push(`- ${r}`);
+  out.push("");
+  out.push("## Layer 4 — Interpersonal Protocol"); out.push("");
+  for (const r of d.layer_4_interpersonal_protocol) out.push(`- ${r}`);
+  out.push("");
+  out.push("## Layer 5 — Boundaries"); out.push("");
+  for (const b of d.layer_5_boundaries) {
+    out.push(`- **${b.topic}** — ${b.why_avoid}`);
+    out.push(`  - Declining phrase: "${stripQuotes(b.declining_phrase)}"`);
+  }
+  out.push("");
+  out.push("---"); out.push("");
+  out.push("## Runtime shorthand (this is what the chat model sees)"); out.push("");
+  out.push(d.runtime_shorthand); out.push("");
+  return out.join("\n");
+}
+function renderSkillMd(brief, d) {
+  const rules = d.layer_0_hard_rules.map((r, i) => `${i+1}. ${r}`).join("\n");
+  return [
+    `You are an AI model simulating the public conversational persona of ${brief.display_name}. You are NOT the actual person — you are an AI approximation for authorised use.`,
+    "",
+    "# Hard rules (non-negotiable)",
+    "",
+    rules,
+    "",
+    "# Voice",
+    "",
+    d.runtime_shorthand,
+    "",
+    "Stay in character. If sincerely confronted about authenticity, acknowledge once that you are an AI and then continue.",
+  ].join("\n");
+}
+function buildMeta(brief, teacherModel) {
+  return {
+    skill_id: `${brief.creator_slug}-draft`,
+    display_name: `${brief.display_name} (DRAFT)`,
+    version: "0.1.0-draft",
+    created_at: new Date().toISOString().slice(0, 10),
+    base_model: teacherModel,
+    lora_name: null,
+    language: brief.language,
+    extra_request_kwargs: {
+      chat_template_kwargs: { enable_thinking: false },
+    },
+    disclaimer: "Auto-generated DRAFT. Not licensed by the subject. NOT FOR PUBLIC SERVING.",
+    consent_status: "DRAFT — awaiting contract",
+    tags: [...(brief.primary_domains || []), ...(brief.speech_register || [])],
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Submit: build brief, call vLLM direct, parse JSON, render.
+   ════════════════════════════════════════════════════════════════ */
+const statusEl = document.getElementById("status");
+const btnGen = document.getElementById("btn-generate");
+
+let lastArtifacts = null;  // { brief, meta, persona_md, skill_md }
+
+async function generateDraft() {
+  const brief = {
+    creator_slug: slugEl.value.trim() || slugify(nameEl.value),
+    display_name: nameEl.value.trim(),
+    language: document.getElementById("f-lang").value,
+    brief: document.getElementById("f-brief").value.trim(),
+    primary_domains: [...selected.primary_domains],
+    speech_register: [...selected.speech_register],
+    catchphrases: document.getElementById("f-catchphrases").value
+      .split("\n").map(s => s.trim()).filter(Boolean),
+    topics_to_avoid: [...selected.topics_to_avoid],
+  };
+  if (!brief.display_name || !brief.creator_slug || !brief.brief) {
+    statusEl.textContent = "请填必填字段 (name / slug / brief)";
+    statusEl.className = "status err";
+    return;
+  }
+
+  btnGen.disabled = true;
+  statusEl.textContent = "调 vLLM 中…约 10 秒";
+  statusEl.className = "status";
+
+  const body = {
+    model: LLM_MODEL,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userPrompt(brief) },
+    ],
+    temperature: 0.4,
+    top_p: 0.9,
+    max_tokens: 3000,
+    stream: false,
+    chat_template_kwargs: { enable_thinking: false },
+    response_format: { type: "json_schema", json_schema: DRAFT_PERSONA_SCHEMA },
+  };
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(`${LLM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${txt.slice(0,300)}`);
+    }
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("vLLM 返回空 content");
+
+    const draft = JSON.parse(content);
+    const persona_md = renderPersonaMd(brief, draft);
+    const skill_md = renderSkillMd(brief, draft);
+    const meta = buildMeta(brief, LLM_MODEL);
+
+    lastArtifacts = { brief, draft, meta, persona_md, skill_md };
+
+    const dt = ((performance.now() - t0) / 1000).toFixed(1);
+    statusEl.textContent = `✓ 用时 ${dt}s — ${meta.skill_id}`;
+    statusEl.className = "status ok";
+    showResult();
+    initChat();
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "✗ " + err.message;
+    statusEl.className = "status err";
+  } finally {
+    btnGen.disabled = false;
+  }
+}
+btnGen.onclick = generateDraft;
+
+function showResult() {
+  const r = document.getElementById("result");
+  r.classList.add("visible");
+  document.getElementById("pane-meta").textContent =
+    JSON.stringify(lastArtifacts.meta, null, 2);
+  document.getElementById("pane-persona").textContent = lastArtifacts.persona_md;
+  document.getElementById("pane-skill").textContent = lastArtifacts.skill_md;
+}
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+    t.classList.add("on");
+    for (const name of ["meta","persona","skill"]) {
+      document.getElementById("pane-"+name).style.display =
+        t.dataset.tab === name ? "" : "none";
+    }
+  };
+});
+
+/* ════════════════════════════════════════════════════════════════
+   Downloads
+   ════════════════════════════════════════════════════════════════ */
+function dl(name, content, mime="text/plain") {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById("btn-dl-meta").onclick = () =>
+  lastArtifacts && dl("meta.json", JSON.stringify(lastArtifacts.meta, null, 2), "application/json");
+document.getElementById("btn-dl-persona").onclick = () =>
+  lastArtifacts && dl("persona.md", lastArtifacts.persona_md, "text/markdown");
+document.getElementById("btn-dl-skill").onclick = () =>
+  lastArtifacts && dl("skill.md", lastArtifacts.skill_md, "text/markdown");
+
+/* ════════════════════════════════════════════════════════════════
+   Try-chat: stream against vLLM using our generated skill.md
+   ════════════════════════════════════════════════════════════════ */
+let chatMsgs = [];
+function initChat() {
+  chatMsgs = [];
+  document.getElementById("chat").classList.add("visible");
+  document.getElementById("thread").innerHTML = "";
+  document.getElementById("chat-input").focus();
+}
+function addBubble(role, text) {
+  const t = document.getElementById("thread");
+  const b = document.createElement("div");
+  b.className = "bubble " + role;
+  b.textContent = text;
+  t.appendChild(b);
+  t.scrollTop = t.scrollHeight;
+  return b;
+}
+async function sendChat() {
+  if (!lastArtifacts) return;
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  addBubble("user", text);
+  chatMsgs.push({ role: "user", content: text });
+
+  const bubble = addBubble("assistant", "…");
+  let acc = "";
+
+  const body = {
+    model: LLM_MODEL,
+    messages: [
+      { role: "system", content: lastArtifacts.skill_md },
+      ...chatMsgs,
+    ],
+    temperature: 0.8, top_p: 0.9, max_tokens: 400,
+    stream: true,
+    chat_template_kwargs: { enable_thinking: false },
+  };
+  try {
+    const resp = await fetch(`${LLM_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const ev = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        if (!ev.startsWith("data:")) continue;
+        const payload = ev.slice(5).trim();
+        if (payload === "[DONE]") break;
+        try {
+          const j = JSON.parse(payload);
+          const delta = j.choices?.[0]?.delta?.content;
+          if (delta) { acc += delta; bubble.textContent = acc; }
+        } catch (_) {}
+      }
+    }
+    chatMsgs.push({ role: "assistant", content: acc });
+  } catch (err) {
+    bubble.textContent = "[error: " + err.message + "]";
+  }
+}
+document.getElementById("btn-send").onclick = sendChat;
+document.getElementById("chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+document.getElementById("btn-reset-chat").onclick = () => {
+  chatMsgs = [];
+  document.getElementById("thread").innerHTML = "";
+};
+
+/* Health ping */
+(async () => {
+  try {
+    const r = await fetch(`${LLM_BASE}/models`);
+    if (r.ok) {
+      const d = await r.json();
+      document.getElementById("backend-status").textContent =
+        `API: ${d.data?.[0]?.id || "?"} @ llm.insnaplive.com`;
+      document.getElementById("backend-status").className = "status ok";
+    }
+  } catch (_) {}
+})();
+</script>
+
+</body>
+</html>

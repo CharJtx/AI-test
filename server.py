@@ -36,6 +36,9 @@ from fastapi.responses import StreamingResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# ── 本地 skill 系统（独立路由，走自建 vLLM 后端，不影响现有 /api/chat 的 OpenRouter 流程）
+from services.skill_inference.router import router as skill_router
+
 # ── 应用初始化 ──────────────────────────────────────────────
 
 # 从 .env 文件加载环境变量（主要是 OPENROUTER_API_KEY）
@@ -3889,6 +3892,10 @@ async def revise_kol_character(request: Request):
 async def healthz():
     """容器健康检查端点。"""
     return {"ok": True}
+
+
+# ── 人物 skill 路由（独立系统，指向本地 vLLM / llm.insnaplive.com）
+app.include_router(skill_router, prefix="/api/skills")
 
 
 # ── 静态文件托管 ────────────────────────────────────────────

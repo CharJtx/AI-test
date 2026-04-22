@@ -31,3 +31,13 @@ playground/scenes/**/*.avi
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Skill system — source-of-truth files (meta.json / persona.md / skill.md) ARE tracked.
+# Heavy artifacts are not.
+skills/*/lora/
+skills/*/voice/
+skills/*/provenance/
+work/            # ingestion + training scratch
+
+# Sensitive
+docs/creator_contract_signed_*.pdf

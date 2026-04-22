@@ -1,0 +1,26 @@
+# Self-contained transcribe image: yt-dlp + ffmpeg + faster-whisper.
+#
+# Built once on the server, cached locally as skill-transcribe:v1.
+# Pin every layer to avoid surprise breakage from upstream tag moves.
+#
+# CUDA 12.4 runtime is binary-compatible with host driver >= 550 (our host
+# runs 570). cuDNN 9 ships with faster-whisper via CTranslate2 wheel >=4.5.
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HUB_ENABLE_HF_TRANSFER=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip ffmpeg ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Pinned versions known to work together (Apr 2026).
+RUN pip3 install --no-cache-dir \
+      "faster-whisper==1.0.3" \
+      "yt-dlp==2025.2.19" \
+      "huggingface_hub[hf_transfer]==0.28.1" \
+      "pyyaml==6.0.2"
+
+WORKDIR /work

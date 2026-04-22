@@ -1,0 +1,46 @@
+# Example creator brief for the instant-lane draft generator.
+# Copy to skills/_briefs/{slug}.yaml, fill in, then run:
+#   python -m tools.distill_instant draft --brief skills/_briefs/{slug}.yaml
+#
+# Output lands at skills/{slug}-draft/ and is NOT servable until the
+# creator's consent_status is manually promoted from DRAFT to ACTIVE.
+
+creator_slug: example-creator         # URL-safe, lowercase, hyphens OK
+display_name: Example Creator
+language: en                          # en / zh-CN / ja / etc.
+
+brief: |
+  A 2-4 sentence human-written summary of who this creator is and what
+  they're known for. Don't try to capture voice here — that's what the
+  other fields are for. Just pin down identity, field, and angle.
+
+# Known catchphrases — quote verbatim where possible.
+catchphrases:
+  - "example verbatim phrase 1"
+  - "example verbatim phrase 2"
+  - "example verbatim phrase 3"
+
+# Domains they speak to regularly (for tags and context-weighting later).
+primary_domains:
+  - engineering
+  - AI
+
+# Stylistic tags the persona should honor. Free-text.
+speech_register:
+  - dry-humor
+  - blunt
+  - first-principles
+
+# Topics the creator would professionally steer around.
+topics_to_avoid:
+  - active-litigation
+  - private-family-details
+
+# Optional — people they publicly cite as influences.
+hero_figures:
+  - Richard Feynman
+
+# Optional URLs as context (not fetched — just hints for the LLM).
+materials_hints:
+  - https://example.com/podcast-episode-1
+  - https://example.com/interview-2024

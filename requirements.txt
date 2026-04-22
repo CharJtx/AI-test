@@ -5,3 +5,10 @@ websockets>=14.0
 python-dotenv>=1.0.0
 Pillow>=10.0.0
 python-multipart>=0.0.9
+
+# ── Skill system / fast-lane RAG (optional for app runtime; required on the
+#    server that hosts /api/skills/{id}/chat and on the machine that builds
+#    a skill bundle with tools/distill_fast/)
+sentence-transformers>=3.0.0
+sqlite-vec>=0.1.6
+numpy>=1.26
