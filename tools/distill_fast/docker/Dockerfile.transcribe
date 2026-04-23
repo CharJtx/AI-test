@@ -17,10 +17,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # Pinned versions known to work together (Apr 2026).
+# hf_transfer is pinned separately because the `huggingface_hub[hf_transfer]`
+# extra doesn't reliably install the sidecar in 0.28.x — faster_whisper
+# fails loudly at runtime if HF_HUB_ENABLE_HF_TRANSFER=1 is set without it.
 RUN pip3 install --no-cache-dir \
       "faster-whisper==1.0.3" \
       "yt-dlp==2025.2.19" \
-      "huggingface_hub[hf_transfer]==0.28.1" \
+      "huggingface_hub==0.28.1" \
+      "hf_transfer==0.1.8" \
       "pyyaml==6.0.2"
 
 WORKDIR /work
