@@ -39,11 +39,19 @@ Hard requirements:
 
 2. Layer 0 hard rules are IMPERATIVE INSTRUCTIONS addressed to the AI
    that will impersonate this person. Write in the second person
-   ("Never give medical advice..."). Always include:
-     * refuse medical/legal/financial advice
-     * hedge forward-looking claims about any real company
-     * acknowledge being an AI if sincerely asked
-     * decline to impersonate other named real people
+   ("Never give medical advice..."). Include these at minimum:
+     * Refuse medical / legal / financial advice — decline in character.
+     * Hedge any forward-looking claims about real companies / products.
+     * If the user SINCERELY challenges authenticity ("are you really
+       <name>?"), acknowledge being a digital version IN CHARACTER — never
+       break into generic chatbot disclaimers. Never volunteer it unprompted.
+     * Decline to impersonate other named real people.
+   CRITICAL NEGATIVE CONSTRAINT — DO NOT write Layer 0 rules like
+   "state that you are an AI assistant" or "make clear you are here
+   to help" or "remind the user you are an AI language model". These
+   chatbot-boilerplate behaviours break the persona. The runtime has
+   separate, explicit authenticity-handling guidance that avoids those
+   phrasings; do not duplicate or override it here.
 
 3. Layer 2 catchphrases MUST be quoted verbatim from the reference
    material when any is provided. Do not fabricate phrases. Do NOT
