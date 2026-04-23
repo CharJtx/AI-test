@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Skill 创建 v2 — Grounded Draft</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .main { max-width: 980px; margin: 0 auto; padding: 18px; }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .section h2 {
+    margin: 0 0 4px; font-size: 14px; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section h2 .tag {
+    background: var(--bg); border: 1px solid var(--border);
+    font-size: 10px; color: var(--text-muted);
+    padding: 1px 6px; border-radius: 4px; font-weight: normal;
+  }
+  .section h2 .req { color: #f08383; font-weight: normal; font-size: 11px; margin-left: auto; }
+  .section .hint { color: var(--text-muted); font-size: 11px; margin-bottom: 10px; }
+  label { display: block; font-size: 11px; color: var(--text-muted); margin: 8px 0 4px; }
+  input[type=text], textarea, select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    padding: 7px 10px; font-size: 13px; font-family: inherit; line-height: 1.5;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .row > .compact { flex: 0 0 130px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .chip {
+    padding: 3px 10px; border-radius: 999px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-muted); font-size: 11px; cursor: pointer; user-select: none;
+    transition: all 0.1s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
+  .chip.on { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+  .chip-add {
+    width: auto; min-width: 140px; padding: 3px 10px; font-size: 11px; border-radius: 999px;
+    background: transparent; border: 1px dashed var(--border); color: var(--text-muted);
+  }
+
+  .diary-item { margin-bottom: 10px; padding: 10px; background: var(--bg);
+                border: 1px solid var(--border); border-radius: var(--radius); }
+  .diary-item .q { font-size: 12px; color: var(--text); margin-bottom: 6px; font-weight: 500; }
+
+  .uploads { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .upload-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 12px;
+  }
+  .upload-item .fname { flex: 1; color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+  .upload-item .fsize { color: var(--text-muted); font-size: 11px; }
+  .upload-item .rm { cursor: pointer; color: var(--text-muted); padding: 0 4px; }
+  .upload-item .rm:hover { color: #f08383; }
+  .file-drop {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 14px; text-align: center; color: var(--text-muted);
+    font-size: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .file-drop:hover, .file-drop.drag { border-color: var(--accent); color: var(--text); }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-top: 18px; }
+  .btn-primary {
+    background: var(--accent); color: #0d1117; border: none; border-radius: var(--radius);
+    padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+    padding: 7px 14px; font-size: 12px; border-radius: var(--radius); cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--accent); }
+  .status { color: var(--text-muted); font-size: 12px; flex: 1; }
+  .status.ok { color: #6ecb63; }
+  .status.err { color: #f08383; }
+  .spinner {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid var(--text-muted); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    margin-right: 6px; vertical-align: -1px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .mode-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    margin-left: 8px;
+  }
+  .mode-badge.grounded { background: rgba(110, 203, 99, 0.15); color: #6ecb63; border: 1px solid #6ecb63; }
+  .mode-badge.instant  { background: rgba(139, 148, 158, 0.15); color: var(--text-muted); border: 1px solid var(--border); }
+
+  .result { margin-top: 14px; display: none; }
+  .result.on { display: block; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+  .tab {
+    padding: 7px 12px; cursor: pointer; font-size: 12px;
+    color: var(--text-muted); border-bottom: 2px solid transparent;
+  }
+  .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .pane {
+    background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+    max-height: 440px; overflow: auto;
+  }
+
+  .chat { display: none; margin-top: 14px; }
+  .chat.on { display: block; }
+  .thread { display: flex; flex-direction: column; gap: 8px;
+            min-height: 80px; max-height: 380px; overflow: auto; padding: 6px 0; }
+  .bubble {
+    max-width: 78%; padding: 9px 12px; border-radius: 14px;
+    font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  }
+  .bubble.user { align-self: flex-end; background: var(--accent); color: #0d1117; }
+  .bubble.assistant { align-self: flex-start; background: var(--surface2); border: 1px solid var(--border); }
+  .inputbar { display: flex; gap: 8px; margin-top: 10px; }
+  .inputbar input { flex: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Skill 创建 v2</h1>
+  <div class="header-actions">
+    <span class="status" id="backend-status">API: llm.insnaplive.com</span>
+    <a href="/" class="btn-ghost" style="text-decoration:none">← 主页</a>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- S1 basics -->
+  <div class="section">
+    <h2>S1. 基本信息 <span class="req">必填</span></h2>
+    <div class="hint">20 秒。名字 + 系统 slug + 语言。</div>
+    <div class="row">
+      <div>
+        <label>Display name</label>
+        <input id="f-name" type="text" placeholder="Alice" />
+      </div>
+      <div>
+        <label>Slug (auto)</label>
+        <input id="f-slug" type="text" placeholder="alice" />
+      </div>
+      <div class="compact">
+        <label>Language</label>
+        <select id="f-lang">
+          <option value="en" selected>en</option>
+          <option value="zh-CN">zh-CN</option>
+          <option value="ja">ja</option>
+          <option value="es">es</option>
+          <option value="fr">fr</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- S2 self-intro -->
+  <div class="section">
+    <h2>S2. 讲讲你自己 <span class="req">必填 · 最少 100 字</span></h2>
+    <div class="hint">
+      你是谁、做什么、最近在想什么、脑子里经常冒出的想法。
+      <strong>写 200-500 字产出最佳。</strong>
+      这是我们对你唯一的第一手认知。
+    </div>
+    <textarea id="f-intro" rows="7"
+      placeholder="我是一个 31 岁的软件工程师，六年下来对单一产地咖啡越来越上头……"></textarea>
+    <div class="hint" style="text-align:right; margin-top:4px; margin-bottom:0">
+      <span id="intro-count">0</span> / 50+
+    </div>
+  </div>
+
+  <!-- S3 samples (files + paste + later: URLs) -->
+  <div class="section">
+    <h2>S3. 你的文字样本 <span class="tag">Grounded 模式关键</span></h2>
+    <div class="hint">
+      上传或粘贴任何你写过的东西：博客、推文、邮件、长篇评论、旧日记、公众号文章……
+      这是 Layer 2（招牌话术、语体）和引用证据的来源。
+      <strong>有真实样本时，质量跃升巨大。</strong>
+    </div>
+
+    <label>拖拽或选择文件（.txt / .md，可多选）</label>
+    <div class="file-drop" id="drop">
+      点击或拖拽文件到这里
+      <input type="file" id="file-input" accept=".txt,.md,.text" multiple hidden />
+    </div>
+    <div class="uploads" id="uploads"></div>
+
+    <label style="margin-top:14px">额外文本（粘贴任意内容）</label>
+    <textarea id="f-paste" rows="5"
+      placeholder="一次粘贴一大片：博客片段、历史对话、邮件节选……"></textarea>
+  </div>
+
+  <!-- S4 soul-probe -->
+  <div class="section">
+    <h2>S4. 灵魂小调查 <span class="tag">可选 · 但强烈建议</span></h2>
+    <div class="hint">
+      5 个不对称问题，答任意多少。每个 1-3 句就够。设计来<strong>挖你真实的声音</strong>，不是套话 chip。
+    </div>
+    <div id="diary"></div>
+  </div>
+
+  <!-- S5 boundaries -->
+  <div class="section">
+    <h2>S5. 话题边界 <span class="req">必填</span></h2>
+    <div class="hint">你的分身应该回避哪些话题。医疗/法律/金融会默认加入硬规则，这里是额外。</div>
+    <div class="chips" data-field="topics_to_avoid"></div>
+    <input class="chip-add" type="text" data-target="topics_to_avoid" placeholder="+ 自定义 (Enter)" />
+  </div>
+
+  <!-- Generate -->
+  <div class="toolbar">
+    <button class="btn-primary" id="btn-generate">生成我的分身</button>
+    <span class="status" id="status">
+      模式：<span id="mode-badge" class="mode-badge grounded">Grounded ✨</span>
+    </span>
+  </div>
+
+  <!-- Result + chat -->
+  <section class="result" id="result">
+    <div class="tabs">
+      <div class="tab on" data-tab="summary">摘要</div>
+      <div class="tab" data-tab="meta">meta.json</div>
+      <div class="tab" data-tab="persona">persona.md</div>
+      <div class="tab" data-tab="skill">skill.md</div>
+    </div>
+    <div id="pane-summary" class="pane"></div>
+    <div id="pane-meta" class="pane" style="display:none"></div>
+    <div id="pane-persona" class="pane" style="display:none"></div>
+    <div id="pane-skill" class="pane" style="display:none"></div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn-ghost" id="btn-dl-meta">下载 meta.json</button>
+      <button class="btn-ghost" id="btn-dl-persona">下载 persona.md</button>
+      <button class="btn-ghost" id="btn-dl-skill">下载 skill.md</button>
+    </div>
+  </section>
+
+  <section class="chat" id="chat">
+    <div class="section">
+      <h2>试聊</h2>
+      <div class="hint">用生成的 skill 作 system prompt + RAG 检索（top-5 自己说过的话）辅助回答。</div>
+      <div class="thread" id="thread"></div>
+      <div class="inputbar">
+        <input id="chat-input" type="text" placeholder="问自己点什么…" />
+        <button class="btn-primary" id="btn-send">发送</button>
+        <button class="btn-ghost" id="btn-reset-chat">清空</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* ═════════════════════════════════════════════════════════════════
+   API endpoints (后端 = skill-worker 透明代理 + 新端点)
+   ═════════════════════════════════════════════════════════════════ */
+const API_BASE = "https://llm.insnaplive.com";   // skill-worker 门面
+const PROBE_MODEL_URL = `${API_BASE}/v1/models`;
+const INGEST_URL = `${API_BASE}/api/skills/ingest-and-generate`;
+const CHAT_URL = (slug) => `${API_BASE}/api/skills/${encodeURIComponent(slug)}/chat`;
+
+/* ═════════════════════════════════════════════════════════════════
+   Soul-probe questions (S4)
+   ═════════════════════════════════════════════════════════════════ */
+const DIARY_PROMPTS = [
+  "说一个你觉得大多数人想错了的观点",
+  "你最近跟人反复讲过的同一件事是什么",
+  "你发脾气或兴奋的时候，语言会怎么变化",
+  "不在的时候，别人可能会怎么评价你",
+  "你绝对不会跟陌生人说的一件事（简短描述即可，不用细节）",
+];
+
+/* ═════════════════════════════════════════════════════════════════
+   Boundary chips (S5)
+   ═════════════════════════════════════════════════════════════════ */
+const BOUNDARY_CHIPS = [
+  "medical", "legal", "financial-advice",
+  "political-endorsement", "religion", "NSFW",
+  "private-family", "active-litigation", "unverified-rumors",
+];
+const selected = { topics_to_avoid: new Set() };
+
+/* ═════════════════════════════════════════════════════════════════
+   Setup UI
+   ═════════════════════════════════════════════════════════════════ */
+function slugify(s) {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
+}
+
+// diary section render
+(() => {
+  const host = document.getElementById("diary");
+  DIARY_PROMPTS.forEach((q, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "diary-item";
+    wrap.innerHTML = `
+      <div class="q">Q${i+1}. ${q}</div>
+      <textarea data-diary-i="${i}" rows="2" placeholder="(可跳过)"></textarea>
+    `;
+    host.appendChild(wrap);
+  });
+})();
+
+// boundary chip render
+function renderBoundaryChips() {
+  const host = document.querySelector('.chips[data-field="topics_to_avoid"]');
+  host.innerHTML = "";
+  const all = new Set([...BOUNDARY_CHIPS, ...selected.topics_to_avoid]);
+  for (const t of all) {
+    const el = document.createElement("span");
+    el.className = "chip" + (selected.topics_to_avoid.has(t) ? " on" : "");
+    el.textContent = t;
+    el.onclick = () => {
+      selected.topics_to_avoid.has(t)
+        ? selected.topics_to_avoid.delete(t)
+        : selected.topics_to_avoid.add(t);
+      renderBoundaryChips();
+    };
+    host.appendChild(el);
+  }
+}
+renderBoundaryChips();
+document.querySelectorAll(".chip-add").forEach(inp => {
+  inp.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const v = inp.value.trim();
+    if (v) { selected.topics_to_avoid.add(v); renderBoundaryChips(); inp.value = ""; }
+  });
+});
+
+// auto-slug from name
+const nameEl = document.getElementById("f-name");
+const slugEl = document.getElementById("f-slug");
+let slugTouched = false;
+slugEl.addEventListener("input", () => { slugTouched = true; });
+nameEl.addEventListener("input", () => {
+  if (!slugTouched) slugEl.value = slugify(nameEl.value);
+});
+
+// intro char count + mode badge update
+const introEl = document.getElementById("f-intro");
+const introCountEl = document.getElementById("intro-count");
+const pasteEl = document.getElementById("f-paste");
+const modeBadge = document.getElementById("mode-badge");
+function updateModeBadge() {
+  const hasMaterial = pasteEl.value.trim().length > 50 ||
+                      uploadedFiles.length > 0 ||
+                      diaryCount() > 0;
+  if (hasMaterial) {
+    modeBadge.textContent = "Grounded ✨";
+    modeBadge.className = "mode-badge grounded";
+  } else {
+    modeBadge.textContent = "Instant (LLM 脑补)";
+    modeBadge.className = "mode-badge instant";
+  }
+}
+function diaryCount() {
+  return Array.from(document.querySelectorAll("[data-diary-i]"))
+    .filter(t => t.value.trim().length > 0).length;
+}
+introEl.addEventListener("input", () => {
+  introCountEl.textContent = introEl.value.length;
+  updateModeBadge();
+});
+pasteEl.addEventListener("input", updateModeBadge);
+document.getElementById("diary").addEventListener("input", updateModeBadge);
+updateModeBadge();
+
+/* ═════════════════════════════════════════════════════════════════
+   File upload (S3) — read as text in browser, never leaves until submit
+   ═════════════════════════════════════════════════════════════════ */
+const uploadedFiles = [];  // [{name, size, text}]
+function renderUploads() {
+  const host = document.getElementById("uploads");
+  host.innerHTML = "";
+  uploadedFiles.forEach((f, i) => {
+    const el = document.createElement("div");
+    el.className = "upload-item";
+    el.innerHTML = `
+      <span class="fname">${f.name}</span>
+      <span class="fsize">${(f.size/1024).toFixed(1)} KB, ${f.text.length.toLocaleString()} chars</span>
+      <span class="rm" data-i="${i}" title="移除">✕</span>
+    `;
+    el.querySelector(".rm").onclick = () => {
+      uploadedFiles.splice(i, 1); renderUploads(); updateModeBadge();
+    };
+    host.appendChild(el);
+  });
+}
+async function addFiles(files) {
+  for (const f of files) {
+    if (!/\.(txt|md|text)$/i.test(f.name)) continue;
+    if (f.size > 5 * 1024 * 1024) { alert(`跳过 ${f.name}（大于 5MB）`); continue; }
+    const text = await f.text();
+    uploadedFiles.push({ name: f.name, size: f.size, text });
+  }
+  renderUploads();
+  updateModeBadge();
+}
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file-input");
+drop.onclick = () => fileInput.click();
+fileInput.onchange = e => addFiles(e.target.files);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("drag"); };
+drop.ondragleave = () => drop.classList.remove("drag");
+drop.ondrop = e => {
+  e.preventDefault(); drop.classList.remove("drag");
+  addFiles(e.dataTransfer.files);
+};
+
+/* ═════════════════════════════════════════════════════════════════
+   Submit — build CreatorBriefRich payload, POST, show result + chat
+   ═════════════════════════════════════════════════════════════════ */
+const statusEl = document.getElementById("status");
+const btnGen = document.getElementById("btn-generate");
+let lastArtifacts = null;
+
+async function submit() {
+  const display_name = nameEl.value.trim();
+  const creator_slug = slugEl.value.trim() || slugify(display_name);
+  const self_intro = introEl.value.trim();
+  if (!display_name) return alert("填 Display name");
+  if (!creator_slug || !/^[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]$/.test(creator_slug))
+    return alert("Slug 无效（小写字母/数字/连字符，2-64 字符）");
+  if (self_intro.length < 50) return alert("自述至少 50 字符");
+
+  const material_texts = [];
+  for (const f of uploadedFiles) {
+    material_texts.push({ source: f.name, kind: "text", content: f.text });
+  }
+  const paste = pasteEl.value.trim();
+  if (paste) material_texts.push({ source: "pasted", kind: "text", content: paste });
+
+  const diary = [];
+  document.querySelectorAll("[data-diary-i]").forEach(t => {
+    const i = parseInt(t.dataset.diaryI);
+    const a = t.value.trim();
+    if (a) diary.push({ prompt: DIARY_PROMPTS[i], answer: a });
+  });
+
+  const payload = {
+    creator_slug,
+    display_name,
+    language: document.getElementById("f-lang").value,
+    self_intro,
+    material_texts,
+    diary,
+    topics_to_avoid: [...selected.topics_to_avoid],
+    prefer_grounded: true,
+  };
+
+  btnGen.disabled = true;
+  statusEl.innerHTML = `<span class="spinner"></span> 处理中… 约 30-90 秒（取决于你上传的量）`;
+  statusEl.className = "status";
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(INGEST_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${txt.slice(0, 300)}`);
+    }
+    const data = await resp.json();
+    const dt = ((performance.now() - t0) / 1000).toFixed(1);
+    statusEl.textContent = `✓ 用时 ${dt}s — ${data.slug}，${data.grounding_stats.n_chunks} chunks, ${data.grounding_stats.n_citations} 条引用`;
+    statusEl.className = "status ok";
+    lastArtifacts = data;
+    renderResult();
+    initChat();
+  } catch (err) {
+    statusEl.textContent = "✗ " + err.message;
+    statusEl.className = "status err";
+    console.error(err);
+  } finally {
+    btnGen.disabled = false;
+  }
+}
+btnGen.onclick = submit;
+
+function renderResult() {
+  const d = lastArtifacts;
+  document.getElementById("result").classList.add("on");
+
+  const gs = d.grounding_stats;
+  const summary = [
+    `# ${d.meta.display_name}`,
+    ``,
+    `  slug:          ${d.slug}`,
+    `  base_model:    ${d.meta.base_model}`,
+    `  source_as_of:  ${d.meta.source_as_of}`,
+    ``,
+    `  grounding:`,
+    `    n_chunks:    ${gs.n_chunks}`,
+    `    embed_model: ${gs.embed_model}`,
+    `    layers:      ${gs.layers_retrieved.join(", ")}`,
+    `    citations:   ${gs.n_citations}`,
+    ``,
+    `  known_limitations:`,
+    ...(d.meta.known_limitations || []).map(s => `    - ${s}`),
+  ].join("\n");
+
+  document.getElementById("pane-summary").textContent = summary;
+  document.getElementById("pane-meta").textContent = JSON.stringify(d.meta, null, 2);
+  document.getElementById("pane-persona").textContent = d.persona_md;
+  document.getElementById("pane-skill").textContent = d.skill_md;
+}
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+    t.classList.add("on");
+    for (const name of ["summary", "meta", "persona", "skill"]) {
+      document.getElementById("pane-" + name).style.display =
+        t.dataset.tab === name ? "" : "none";
+    }
+  };
+});
+
+function dl(name, content, mime = "text/plain") {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById("btn-dl-meta").onclick = () =>
+  lastArtifacts && dl("meta.json", JSON.stringify(lastArtifacts.meta, null, 2), "application/json");
+document.getElementById("btn-dl-persona").onclick = () =>
+  lastArtifacts && dl("persona.md", lastArtifacts.persona_md, "text/markdown");
+document.getElementById("btn-dl-skill").onclick = () =>
+  lastArtifacts && dl("skill.md", lastArtifacts.skill_md, "text/markdown");
+
+/* ═════════════════════════════════════════════════════════════════
+   Chat — uses /api/skills/{slug}/chat (RAG-augmented)
+   ═════════════════════════════════════════════════════════════════ */
+let chatMsgs = [];
+function initChat() {
+  chatMsgs = [];
+  document.getElementById("chat").classList.add("on");
+  document.getElementById("thread").innerHTML = "";
+  document.getElementById("chat-input").focus();
+}
+function addBubble(role, text) {
+  const b = document.createElement("div");
+  b.className = "bubble " + role;
+  b.textContent = text;
+  const th = document.getElementById("thread");
+  th.appendChild(b);
+  th.scrollTop = th.scrollHeight;
+  return b;
+}
+async function sendChat() {
+  if (!lastArtifacts) return;
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  addBubble("user", text);
+  chatMsgs.push({ role: "user", content: text });
+  const bubble = addBubble("assistant", "…");
+  let acc = "";
+
+  try {
+    const resp = await fetch(CHAT_URL(lastArtifacts.slug), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: chatMsgs }),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const ev = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        if (!ev.startsWith("data:")) continue;
+        const payload = ev.slice(5).trim();
+        if (payload === "[DONE]") break;
+        try {
+          const j = JSON.parse(payload);
+          const d = j.choices?.[0]?.delta?.content;
+          if (d) { acc += d; bubble.textContent = acc; }
+        } catch (_) {}
+      }
+    }
+    chatMsgs.push({ role: "assistant", content: acc });
+  } catch (err) {
+    bubble.textContent = "[error: " + err.message + "]";
+  }
+}
+document.getElementById("btn-send").onclick = sendChat;
+document.getElementById("chat-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+document.getElementById("btn-reset-chat").onclick = () => {
+  chatMsgs = [];
+  document.getElementById("thread").innerHTML = "";
+};
+
+/* Health ping for the badge */
+(async () => {
+  try {
+    const r = await fetch(PROBE_MODEL_URL);
+    if (r.ok) {
+      const d = await r.json();
+      const id = d.data?.[0]?.id || "?";
+      document.getElementById("backend-status").textContent = `API: ${id} @ llm.insnaplive.com`;
+      document.getElementById("backend-status").className = "status ok";
+    }
+  } catch (_) {}
+})();
+</script>
+
+</body>
+</html>
