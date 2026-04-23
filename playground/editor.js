@@ -455,6 +455,8 @@ function renderStates() {
   }).join('');
 
   bindStateDragAndDrop();
+  // 异步为 region/pulse grid 加载视频首帧背景
+  applyGridBackgrounds();
 }
 
 // ── 状态拖动排序 ──────────────────────────────────────────
@@ -540,10 +542,8 @@ function cellKey(r, c) { return r + ',' + c; }
 function addAction(stateId) {
   const s = sceneData.states[stateId];
   if (!s.on_click) s.on_click = [];
-  const { cols, rows } = sceneData.config.grid;
-  const allCells = [];
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) allCells.push([r, c]);
-  s.on_click.push({ regions: allCells, target: '', pulse_cells: [] });
+  // 默认不选中任何区域，由用户手动圈选
+  s.on_click.push({ regions: [], target: '', pulse_cells: [] });
   markDirty();
   renderStates();
 }
@@ -650,9 +650,113 @@ function togglePulseCell(stateId, idx, r, c) {
   renderStates();
 }
 
+// ── 视频首帧提取 ──────────────────────────────────────────
+// 为 region/pulse 网格提供背景图参照，帮助作者对齐点击区域
+const _frameCache = {}; // videoResId -> dataUrl | 'pending' | 'failed'
+
+function getResourceSrc(resId) {
+  const val = sceneData.resources?.[resId];
+  if (!val) return null;
+  if (val.startsWith('http://') || val.startsWith('https://')) return val;
+  if (!currentScene) return null;
+  return `/scenes-data/${encodeURIComponent(currentScene)}/${encodeURIComponent(val)}`;
+}
+
+function extractFirstFrame(url) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.crossOrigin = 'anonymous';
+
+    let resolved = false;
+    const cleanup = () => { video.src = ''; video.load(); };
+    const timer = setTimeout(() => {
+      if (!resolved) { resolved = true; cleanup(); reject(new Error('timeout')); }
+    }, 12000);
+
+    video.addEventListener('loadeddata', () => {
+      try { video.currentTime = Math.min(0.1, (video.duration || 1) * 0.01); }
+      catch (_) { /* 某些格式不支持 seek */ }
+    });
+    video.addEventListener('seeked', () => {
+      if (resolved) return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        resolved = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve({ dataUrl, width: canvas.width, height: canvas.height });
+      } catch (e) {
+        resolved = true;
+        clearTimeout(timer);
+        cleanup();
+        reject(e);  // 常见：跨域污染 canvas
+      }
+    });
+    video.addEventListener('error', () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error('video load error'));
+    });
+
+    video.src = url;
+  });
+}
+
+async function loadVideoFirstFrame(resId) {
+  const cached = _frameCache[resId];
+  if (cached && cached !== 'pending' && cached !== 'failed') return cached;
+  if (cached === 'pending' || cached === 'failed') return null;
+
+  _frameCache[resId] = 'pending';
+  const url = getResourceSrc(resId);
+  if (!url) { _frameCache[resId] = 'failed'; return null; }
+
+  try {
+    const frame = await extractFirstFrame(url);
+    _frameCache[resId] = frame;
+    return frame;
+  } catch (e) {
+    console.warn(`[frame] failed for ${resId}:`, e.message);
+    _frameCache[resId] = 'failed';
+    return null;
+  }
+}
+
+// 为已渲染的 grid（带 data-video-res 的元素）异步应用背景图
+async function applyGridBackgrounds() {
+  const elements = document.querySelectorAll('[data-video-res]:not([data-bg-applied])');
+  const grouped = {};
+  elements.forEach(el => {
+    const id = el.dataset.videoRes;
+    if (!id) return;
+    (grouped[id] ||= []).push(el);
+  });
+  for (const [resId, els] of Object.entries(grouped)) {
+    const frame = await loadVideoFirstFrame(resId);
+    if (!frame) continue;
+    els.forEach(el => {
+      el.style.setProperty('--grid-bg', `url(${frame.dataUrl})`);
+      el.style.setProperty('--grid-ar', `${frame.width} / ${frame.height}`);
+      el.dataset.bgApplied = '1';
+    });
+  }
+}
+
 function renderActions(stateId, actions) {
   if (!actions.length) return '<div style="color:#3f3f46;font-size:12px">暂无规则</div>';
   const { cols, rows } = sceneData.config.grid;
+  const state = sceneData.states[stateId];
+  const videoRes = state?.video || '';
+  const bgAttr = videoRes ? ` data-video-res="${esc(videoRes)}"` : '';
 
   return actions.map((a, idx) => {
     const isWild = a.regions === '*';
@@ -678,8 +782,13 @@ function renderActions(stateId, actions) {
         }
       }
 
-      gridHtml = `<div class="region-grid" style="grid-template-columns:40px repeat(${cols},1fr)">
-        ${colHeaders}${rowsHtml}
+      // bg-layer：spans data cells area (col 2..-1, row 2..-1)
+      const bgLayer = videoRes
+        ? `<div class="region-bg-layer" style="grid-column:2/-1;grid-row:2/span ${rows}"></div>`
+        : '';
+
+      gridHtml = `<div class="region-grid"${bgAttr} style="grid-template-columns:40px repeat(${cols},1fr)">
+        ${colHeaders}${bgLayer}${rowsHtml}
       </div>`;
     }
 
@@ -702,9 +811,12 @@ function renderActions(stateId, actions) {
           pCells += `<div class="${cls}" ${onclick}>${isPulse ? '●' : ''}</div>`;
         }
       }
+      const pulseBgLayer = videoRes
+        ? `<div class="pulse-bg-layer" style="grid-column:1/-1;grid-row:1/span ${rows}"></div>`
+        : '';
       pulseGridHtml = `<div class="pulse-section">
         <label class="pulse-label">触发点（脉冲圆点）</label>
-        <div class="pulse-grid" style="grid-template-columns:repeat(${cols},1fr)">${pCells}</div>
+        <div class="pulse-grid"${bgAttr} style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${pulseBgLayer}${pCells}</div>
         <div class="pulse-hint">点击已选区域中的格子来设置脉冲提示点</div>
       </div>`;
     }

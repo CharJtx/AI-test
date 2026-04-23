@@ -173,7 +173,8 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 
 /* ── Region Grid Selector ── */
 .region-grid {
-  display: inline-grid; gap: 2px; margin-top: 4px;
+  display: grid; gap: 2px; margin-top: 4px;
+  width: 100%; max-width: 480px;
 }
 .region-corner {
   width: 40px; height: 22px;
@@ -185,18 +186,36 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
   cursor: pointer; transition: all 0.15s; user-select: none;
 }
 .region-col-hdr { height: 22px; }
-.region-row-hdr { width: 40px; height: 24px; }
+.region-row-hdr { width: 40px; }
 .region-col-hdr:hover, .region-row-hdr:hover { border-color: #3b82f6; color: #a1a1aa; }
 .region-col-hdr.selected { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
 .region-row-hdr.selected { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
 .region-cell {
-  height: 24px; border-radius: 3px;
-  background: #1c1c1f; border: 1px solid #27272a;
-  cursor: pointer; transition: all 0.1s;
+  min-height: 36px; border-radius: 3px;
+  background: rgba(28, 28, 31, 0.35); border: 1px solid #27272a;
+  cursor: pointer; transition: all 0.1s; position: relative; z-index: 1;
 }
-.region-cell:hover { border-color: #3b82f6; }
-.region-cell.selected { background: #1e3a5f; border-color: #3b82f6; }
-.region-cell.selected:hover { background: #1e40af; }
+.region-cell:hover { border-color: #3b82f6; background: rgba(28, 28, 31, 0.15); }
+.region-cell.selected { background: rgba(30, 58, 95, 0.65); border-color: #3b82f6; }
+.region-cell.selected:hover { background: rgba(30, 64, 175, 0.75); }
+
+/* bg-layer：视频首帧，覆盖数据 cells 区域（headers 不被遮） */
+.region-bg-layer,
+.pulse-bg-layer {
+  background-image: var(--grid-bg);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 3px;
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
+}
+/* 有背景图时，cells 更高以方便看清 */
+.region-grid[data-video-res] .region-cell,
+.pulse-grid[data-video-res] .pulse-cell {
+  min-height: 44px;
+}
 
 /* ── Sound List ── */
 .sounds-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
@@ -208,17 +227,18 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .pulse-label { font-size: 12px; color: #a1a1aa; margin-bottom: 4px; display: block; }
 .pulse-grid {
   display: grid; gap: 3px; margin: 4px 0;
+  width: 100%; max-width: 480px;
 }
 .pulse-cell {
-  height: 24px; border-radius: 3px; font-size: 11px;
+  min-height: 24px; border-radius: 3px; font-size: 11px;
   display: flex; align-items: center; justify-content: center;
-  background: #18181b; border: 1px solid #27272a; color: transparent;
-  transition: all 0.1s;
+  background: rgba(24, 24, 27, 0.3); border: 1px solid #27272a; color: transparent;
+  transition: all 0.1s; position: relative; z-index: 1;
 }
 .pulse-cell.available {
   cursor: pointer; border-color: #3f3f46; color: #52525b;
 }
-.pulse-cell.available:hover { border-color: #f97316; background: #261a0e; }
+.pulse-cell.available:hover { border-color: #f97316; background: rgba(38, 26, 14, 0.6); }
 .pulse-cell.active {
   background: #f97316; border-color: #fb923c; color: #fff;
   font-weight: 700; box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
