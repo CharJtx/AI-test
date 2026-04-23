@@ -294,6 +294,10 @@ const BOUNDARY_CHIPS = [
 ];
 const selected = { topics_to_avoid: new Set() };
 
+// Declared up here so updateModeBadge() can reference it at script-load
+// time without hitting TDZ; populated later by the file-drop handler.
+const uploadedFiles = [];  // [{name, size, text}]
+
 /* ═════════════════════════════════════════════════════════════════
    Setup UI
    ═════════════════════════════════════════════════════════════════ */
@@ -384,8 +388,8 @@ updateModeBadge();
 
 /* ═════════════════════════════════════════════════════════════════
    File upload (S3) — read as text in browser, never leaves until submit
+   (uploadedFiles array declared at top of script to avoid TDZ.)
    ═════════════════════════════════════════════════════════════════ */
-const uploadedFiles = [];  // [{name, size, text}]
 function renderUploads() {
   const host = document.getElementById("uploads");
   host.innerHTML = "";
