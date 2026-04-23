@@ -657,7 +657,10 @@ const _frameCache = {}; // videoResId -> dataUrl | 'pending' | 'failed'
 function getResourceSrc(resId) {
   const val = sceneData.resources?.[resId];
   if (!val) return null;
-  if (val.startsWith('http://') || val.startsWith('https://')) return val;
+  // 外部 URL：走媒体代理（同源 + CORS 允许，canvas 可读取像素）
+  if (val.startsWith('http://') || val.startsWith('https://')) {
+    return `/api/playground/proxy-media?url=${encodeURIComponent(val)}`;
+  }
   if (!currentScene) return null;
   return `/scenes-data/${encodeURIComponent(currentScene)}/${encodeURIComponent(val)}`;
 }
@@ -782,13 +785,16 @@ function renderActions(stateId, actions) {
         }
       }
 
-      // bg-layer：spans data cells area (col 2..-1, row 2..-1)
+      // bg-layer 放到 grid 外层 wrapper，用 position:absolute 避免影响 grid 布局
       const bgLayer = videoRes
-        ? `<div class="region-bg-layer" style="grid-column:2/-1;grid-row:2/span ${rows}"></div>`
+        ? `<div class="region-grid-bg"></div>`
         : '';
 
-      gridHtml = `<div class="region-grid"${bgAttr} style="grid-template-columns:40px repeat(${cols},1fr)">
-        ${colHeaders}${bgLayer}${rowsHtml}
+      gridHtml = `<div class="region-grid-wrap"${bgAttr}>
+        ${bgLayer}
+        <div class="region-grid" style="grid-template-columns:40px repeat(${cols},1fr)">
+          ${colHeaders}${rowsHtml}
+        </div>
       </div>`;
     }
 
@@ -811,12 +817,13 @@ function renderActions(stateId, actions) {
           pCells += `<div class="${cls}" ${onclick}>${isPulse ? '●' : ''}</div>`;
         }
       }
-      const pulseBgLayer = videoRes
-        ? `<div class="pulse-bg-layer" style="grid-column:1/-1;grid-row:1/span ${rows}"></div>`
-        : '';
+      const pulseBgLayer = videoRes ? `<div class="pulse-grid-bg"></div>` : '';
       pulseGridHtml = `<div class="pulse-section">
         <label class="pulse-label">触发点（脉冲圆点）</label>
-        <div class="pulse-grid"${bgAttr} style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${pulseBgLayer}${pCells}</div>
+        <div class="pulse-grid-wrap"${bgAttr}>
+          ${pulseBgLayer}
+          <div class="pulse-grid" style="grid-template-columns:repeat(${cols},1fr)">${pCells}</div>
+        </div>
         <div class="pulse-hint">点击已选区域中的格子来设置脉冲提示点</div>
       </div>`;
     }

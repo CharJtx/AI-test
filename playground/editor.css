@@ -199,21 +199,53 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
 .region-cell.selected { background: rgba(30, 58, 95, 0.65); border-color: #3b82f6; }
 .region-cell.selected:hover { background: rgba(30, 64, 175, 0.75); }
 
-/* bg-layer：视频首帧，覆盖数据 cells 区域（headers 不被遮） */
-.region-bg-layer,
-.pulse-bg-layer {
+/* ── Region / Pulse 背景层（视频首帧参照） ── */
+.region-grid-wrap {
+  position: relative;
+  width: 100%; max-width: 480px;
+  margin-top: 4px;
+}
+.region-grid-wrap .region-grid {
+  position: relative; z-index: 1; margin-top: 0;
+}
+.region-grid-bg {
+  position: absolute;
+  top: 24px;         /* col-hdr 高 22px + gap 2px */
+  left: 42px;        /* row-hdr 宽 40px + gap 2px */
+  right: 0;
+  bottom: 0;
   background-image: var(--grid-bg);
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  background-position: center;
   border-radius: 3px;
-  opacity: 0.45;
+  opacity: 0.55;
   pointer-events: none;
   z-index: 0;
 }
-/* 有背景图时，cells 更高以方便看清 */
-.region-grid[data-video-res] .region-cell,
-.pulse-grid[data-video-res] .pulse-cell {
+
+.pulse-grid-wrap {
+  position: relative;
+  width: 100%; max-width: 480px;
+  margin: 4px 0;
+}
+.pulse-grid-wrap .pulse-grid {
+  position: relative; z-index: 1; margin: 0;
+}
+.pulse-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image: var(--grid-bg);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-radius: 3px;
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 有背景图时，cells 更高以方便看清并让背景有视觉面积 */
+.region-grid-wrap[data-video-res] .region-cell,
+.pulse-grid-wrap[data-video-res] .pulse-cell {
   min-height: 44px;
 }
 

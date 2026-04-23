@@ -3598,6 +3598,45 @@ async def proxy_download_url(url: str = Query(...)):
     return StreamingResponse(stream_bytes(), media_type="application/octet-stream", headers=headers)
 
 
+@app.get("/api/playground/proxy-media")
+async def proxy_media_url(url: str = Query(...)):
+    """代理内联播放远程 URL 资源，CORS-friendly。
+    区别于 /proxy-download：
+    - 保留上游 Content-Type（video/mp4, audio/mpeg 等）
+    - 不设 Content-Disposition（浏览器直接内联播放）
+    - 注入 Access-Control-Allow-Origin: *，允许客户端 canvas 读取像素
+    - 用于编辑器提取视频首帧作为规则网格背景
+    """
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return JSONResponse({"error": "invalid URL"}, status_code=400)
+
+    # 先用 HEAD/小范围 GET 获取上游 Content-Type
+    upstream_ct = "application/octet-stream"
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as probe:
+            head_resp = await probe.head(url)
+            if head_resp.status_code < 400:
+                ct = head_resp.headers.get("content-type", "")
+                if ct:
+                    upstream_ct = ct
+    except Exception:
+        # HEAD 不被支持时继续，流式请求会重新拿
+        pass
+
+    async def stream_bytes():
+        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+            async with client.stream("GET", url) as resp:
+                async for chunk in resp.aiter_bytes(chunk_size=65536):
+                    yield chunk
+
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Cache-Control": "public, max-age=3600",
+    }
+    return StreamingResponse(stream_bytes(), media_type=upstream_ct, headers=headers)
+
+
 # ── InSnap API 代理 ────────────────────────────────────────
 # 代理转发前端请求到 InSnap 外部 API，避免浏览器 CORS 限制。
 # 配置项通过 .env 中的 INSNAP_API_URL 和 INSNAP_API_KEY 提供。
