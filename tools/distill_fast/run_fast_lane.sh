@@ -37,7 +37,7 @@ fi
 TRANSCRIBE_GPU="${TRANSCRIBE_GPU:-2}"
 EMBED_GPU="${EMBED_GPU:-3}"
 TEACHER_URL="${TEACHER_URL:-https://llm.insnaplive.com/v1}"
-TEACHER_MODEL="${TEACHER_MODEL:-llama3.1-70b-awq}"
+TEACHER_MODEL="${TEACHER_MODEL:-qwen3-14b-awq}"
 EMBED_MODEL="${EMBED_MODEL:-BAAI/bge-m3}"
 
 PYBIN="$(command -v python3 || command -v python)"

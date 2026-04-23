@@ -27,7 +27,7 @@ def main() -> int:
                             help="GPU device for whisper (default cuda:2)")
         if name in ("persona", "all"):
             sp.add_argument("--teacher-url", default="https://llm.insnaplive.com/v1")
-            sp.add_argument("--teacher-model", default="llama3.1-70b-awq")
+            sp.add_argument("--teacher-model", default="qwen3-14b-awq")
         if name in ("embed", "all"):
             sp.add_argument("--embed-model", default="BAAI/bge-m3")
 
