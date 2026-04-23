@@ -743,12 +743,17 @@ async function applyGridBackgrounds() {
     if (!id) return;
     (grouped[id] ||= []).push(el);
   });
+  const { cols, rows } = sceneData.config.grid;
   for (const [resId, els] of Object.entries(grouped)) {
     const frame = await loadVideoFirstFrame(resId);
     if (!frame) continue;
+    // cell 宽高比 = (videoW / cols) : (videoH / rows)
+    const cellW = frame.width / cols;
+    const cellH = frame.height / rows;
     els.forEach(el => {
       el.style.setProperty('--grid-bg', `url(${frame.dataUrl})`);
       el.style.setProperty('--grid-ar', `${frame.width} / ${frame.height}`);
+      el.style.setProperty('--cell-ar', `${cellW} / ${cellH}`);
       el.dataset.bgApplied = '1';
     });
   }

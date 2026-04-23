@@ -243,9 +243,17 @@ select:focus, .num-input:focus, .text-input:focus { outline: none; border-color:
   z-index: 0;
 }
 
-/* 有背景图时，cells 更高以方便看清并让背景有视觉面积 */
+/* 有背景图时：cells 使用和视频一致的宽高比，避免背景被拉伸 */
 .region-grid-wrap[data-video-res] .region-cell,
 .pulse-grid-wrap[data-video-res] .pulse-cell {
+  aspect-ratio: var(--cell-ar, 1);
+  height: auto;
+  min-height: 0;
+}
+/* 尚未加载完首帧（无 --cell-ar）时，给一个临时 min-height，避免抖动 */
+.region-grid-wrap[data-video-res]:not([data-bg-applied]) .region-cell,
+.pulse-grid-wrap[data-video-res]:not([data-bg-applied]) .pulse-cell {
+  aspect-ratio: auto;
   min-height: 44px;
 }
 
