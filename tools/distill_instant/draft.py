@@ -101,7 +101,7 @@ def generate_from_brief(
     meta = {
         "skill_id": f"{brief.creator_slug}-draft",
         "display_name": f"{brief.display_name} (DRAFT)",
-        "version": "0.1.0-draft",
+        "version": "0.2.0-draft",
         "created_at": datetime.now(timezone.utc).date().isoformat(),
         "base_model": teacher_model,
         "lora_name": None,
@@ -115,6 +115,8 @@ def generate_from_brief(
             "only after creator review + signed contract."
         ),
         "consent_status": "DRAFT — awaiting contract",
+        "source_as_of": draft_json.get("source_as_of", "unspecified"),
+        "known_limitations": draft_json.get("layer_6_limitations") or [],
         "tags": (brief.primary_domains or []) + (brief.speech_register or []),
     }
 

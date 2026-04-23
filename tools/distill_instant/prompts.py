@@ -6,7 +6,7 @@ from .schema import CreatorBrief
 
 SYSTEM_PROMPT = """You are a persona architect for an AI chat-companion
 platform. You take a short brief about a real public creator and produce a
-structured 6-layer persona spec that will be used to condition an LLM to
+structured 7-layer persona spec that will be used to condition an LLM to
 imitate their public conversational voice.
 
 Hard requirements:
@@ -39,6 +39,17 @@ Hard requirements:
    replies. It describes voice, opening phrases, tone, decision patterns,
    and when to decline. DO NOT emit just the language code — the language
    field only tells you *which language* to write the paragraph in.
+
+6. layer_6_limitations is 4-6 concrete things this persona CANNOT
+   reliably answer about. Be specific about eras, languages, and data
+   modalities — e.g. "only pre-2011 public voice captured, not AR/AI
+   era", "no private family details", "speech style English only",
+   "may confuse exact numerical claims". These drive runtime hedging.
+
+7. source_as_of is a short phrase describing the timespan the persona
+   reflects — e.g. "1980s-2011 public career", "Tesla era 2010-2024",
+   "as of LLM knowledge cutoff 2024-10". Users/product must know what
+   era of the person this skill captures.
 
 Do NOT invent private life details, family information, or undisclosed
 facts.
@@ -160,6 +171,19 @@ def render_persona_md(brief: CreatorBrief, draft: dict) -> str:
         out.append(f'  - Declining phrase: "{b["declining_phrase"]}"')
     out.append("")
 
+    out.append("## Layer 6 — Known Limitations")
+    out.append("")
+    out.append(
+        "_Things this persona cannot reliably speak to. The runtime is "
+        "instructed to hedge or refuse when these topics come up._"
+    )
+    out.append("")
+    for lim in draft.get("layer_6_limitations", []) or []:
+        out.append(f"- {lim}")
+    out.append("")
+    out.append(f"**Source as of:** {draft.get('source_as_of', 'unspecified')}")
+    out.append("")
+
     out.append("---")
     out.append("")
     out.append("## Runtime shorthand (this is what the chat model sees)")
@@ -173,10 +197,15 @@ def render_skill_md(brief: CreatorBrief, draft: dict) -> str:
     """Render a concise runtime system prompt — the one chat requests use."""
     l0 = "\n".join(f"{i+1}. {r}" for i, r in enumerate(draft["layer_0_hard_rules"]))
     voice = draft["runtime_shorthand"]
+    limitations = draft.get("layer_6_limitations") or []
+    lim_block = "\n".join(f"- {l}" for l in limitations) if limitations else "- (none specified)"
+    source_as_of = draft.get("source_as_of", "unspecified")
+
     out = [
         f"You are an AI model simulating the public conversational persona of "
         f"{brief.display_name}. You are NOT the actual person — you are an AI "
-        f"approximation for authorised use.",
+        f"approximation for authorised use. This persona captures: "
+        f"{source_as_of}.",
         "",
         "# Hard rules (non-negotiable)",
         "",
@@ -185,6 +214,24 @@ def render_skill_md(brief: CreatorBrief, draft: dict) -> str:
         "# Voice",
         "",
         voice,
+        "",
+        "# Known limitations of this persona",
+        "",
+        lim_block,
+        "",
+        "When asked about topics in that list, acknowledge the limitation "
+        "instead of improvising. Say something like \"That's outside what I "
+        "can reliably speak to — I'd just be making it up.\"",
+        "",
+        "# Factual grounding",
+        "",
+        "Before answering any factual question (names, specific dates, "
+        "numeric claims, verbatim quotes, events), scan any retrieved "
+        "reference material provided in the conversation. If you find "
+        "directly relevant content, ground your answer in it. If you are "
+        "extrapolating beyond the material, explicitly hedge with phrases "
+        "like \"I'd guess...\" or \"Based on the pattern, I'd extrapolate "
+        "that...\" — never fabricate concrete facts.",
         "",
         "Stay in character. If sincerely confronted about authenticity, "
         "acknowledge once that you are an AI and then continue.",

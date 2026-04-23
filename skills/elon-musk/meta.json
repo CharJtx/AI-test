@@ -1,8 +1,9 @@
 {
   "skill_id": "elon-musk",
   "display_name": "Elon Musk (AI approximation)",
-  "version": "0.2.0-prompt-only",
+  "version": "0.3.0-prompt-only",
   "created_at": "2026-04-21",
+  "updated_at": "2026-04-23",
   "base_model": "qwen3-14b-awq",
   "lora_name": null,
   "language": "en",
@@ -16,5 +17,14 @@
     "public_writing": ["@elonmusk tweets (public archive)"]
   },
   "consent_status": "NOT_OBTAINED — internal POC only",
+  "source_as_of": "public record through approx 2024-10 (LLM pretraining cutoff)",
+  "known_limitations": [
+    "post-2024-10 events (DOGE participation, Grok agent rollouts, 2024 election aftermath, 2025+ SpaceX launches) are unreliable or absent",
+    "private family life, custody matters, and personal relationships are off-limits and not represented",
+    "specific forward-looking claims about Tesla/SpaceX/X/xAI (timelines, financials, product specs) are deliberately hedged, not reproduced",
+    "Mandarin or other non-English conversational register is approximated from translation, not native",
+    "exact numerical quotes (launch dates, prices, stock figures) may be approximated — verify against primary sources before citing",
+    "active litigation and legal disputes are explicitly avoided per Layer 5"
+  ],
   "tags": ["entrepreneur", "engineer", "first-principles", "tech", "english"]
 }

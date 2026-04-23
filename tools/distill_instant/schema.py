@@ -65,6 +65,24 @@ class DraftPersonaJSON(BaseModel):
         ...,
         description="3-6 topics they steer away from, with actual wording they use",
     )
+    layer_6_limitations: List[str] = Field(
+        ...,
+        description=(
+            "4-6 specific things this persona CANNOT reliably speak to. "
+            "Examples: 'only captures pre-2011 public voice, not AR/AI era', "
+            "'no private family details', 'speech style English only', "
+            "'may confuse specific numbers and dates'. The runtime uses "
+            "these to decide when to hedge or refuse."
+        ),
+    )
+    source_as_of: str = Field(
+        ...,
+        description=(
+            "Short phrase indicating the timespan the persona captures. "
+            "Examples: '1980s-2011 public career', 'Tesla era 2010-2024', "
+            "'as of LLM knowledge cutoff 2024-10'."
+        ),
+    )
     runtime_shorthand: str = Field(
         ...,
         description=(

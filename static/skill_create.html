@@ -352,7 +352,8 @@ const DRAFT_PERSONA_SCHEMA = {
     required: [
       "layer_0_hard_rules", "layer_1_identity", "layer_2_expression",
       "layer_3_decision_logic", "layer_4_interpersonal_protocol",
-      "layer_5_boundaries", "runtime_shorthand",
+      "layer_5_boundaries", "layer_6_limitations", "source_as_of",
+      "runtime_shorthand",
     ],
     properties: {
       layer_0_hard_rules: {
@@ -397,6 +398,10 @@ const DRAFT_PERSONA_SCHEMA = {
           },
         },
       },
+      layer_6_limitations: {
+        type: "array", items: { type: "string" }, minItems: 3,
+      },
+      source_as_of: { type: "string" },
       runtime_shorthand: { type: "string" },
     },
   },
@@ -405,7 +410,7 @@ const DRAFT_PERSONA_SCHEMA = {
 /* ════════════════════════════════════════════════════════════════
    Prompts (ported from tools/distill_instant/prompts.py)
    ════════════════════════════════════════════════════════════════ */
-const SYSTEM_PROMPT = `You are a persona architect for an AI chat-companion platform. You take a short brief about a real public creator and produce a structured 6-layer persona spec that will be used to condition an LLM to imitate their public conversational voice.
+const SYSTEM_PROMPT = `You are a persona architect for an AI chat-companion platform. You take a short brief about a real public creator and produce a structured 7-layer persona spec that will be used to condition an LLM to imitate their public conversational voice.
 
 Hard requirements:
 
@@ -422,6 +427,10 @@ Hard requirements:
 4. Layer 5 boundaries must include the ACTUAL declining phrases the creator would say (in their voice), not abstractions.
 
 5. runtime_shorthand is a full descriptive paragraph (80-150 words), written in the language specified by the brief's language field, that tells a chat model how to imitate this person in casual 1-4 sentence replies. It describes voice, opening phrases, tone, decision patterns, and when to decline. DO NOT emit just the language code.
+
+6. layer_6_limitations is 4-6 concrete things this persona CANNOT reliably answer about. Be specific about eras, languages, and data modalities — e.g. "only pre-2011 public voice captured, not AR/AI era", "no private family details", "speech style English only", "may confuse exact numerical claims". These drive runtime hedging.
+
+7. source_as_of is a short phrase describing the timespan the persona reflects — e.g. "1980s-2011 public career", "Tesla era 2010-2024", "as of LLM knowledge cutoff 2024-10".
 
 Do NOT invent private life details, family information, or undisclosed facts.
 `;
@@ -511,6 +520,13 @@ function renderPersonaMd(brief, d) {
     out.push(`  - Declining phrase: "${stripQuotes(b.declining_phrase)}"`);
   }
   out.push("");
+  out.push("## Layer 6 — Known Limitations"); out.push("");
+  out.push("_Things this persona cannot reliably speak to. The runtime is instructed to hedge or refuse when these topics come up._");
+  out.push("");
+  for (const lim of (d.layer_6_limitations || [])) out.push(`- ${lim}`);
+  out.push("");
+  out.push(`**Source as of:** ${d.source_as_of || "unspecified"}`);
+  out.push("");
   out.push("---"); out.push("");
   out.push("## Runtime shorthand (this is what the chat model sees)"); out.push("");
   out.push(d.runtime_shorthand); out.push("");
@@ -518,8 +534,11 @@ function renderPersonaMd(brief, d) {
 }
 function renderSkillMd(brief, d) {
   const rules = d.layer_0_hard_rules.map((r, i) => `${i+1}. ${r}`).join("\n");
+  const lims = (d.layer_6_limitations || []);
+  const limBlock = lims.length ? lims.map(l => `- ${l}`).join("\n") : "- (none specified)";
+  const sourceAsOf = d.source_as_of || "unspecified";
   return [
-    `You are an AI model simulating the public conversational persona of ${brief.display_name}. You are NOT the actual person — you are an AI approximation for authorised use.`,
+    `You are an AI model simulating the public conversational persona of ${brief.display_name}. You are NOT the actual person — you are an AI approximation for authorised use. This persona captures: ${sourceAsOf}.`,
     "",
     "# Hard rules (non-negotiable)",
     "",
@@ -529,14 +548,24 @@ function renderSkillMd(brief, d) {
     "",
     d.runtime_shorthand,
     "",
+    "# Known limitations of this persona",
+    "",
+    limBlock,
+    "",
+    "When asked about topics in that list, acknowledge the limitation instead of improvising. Say something like \"That's outside what I can reliably speak to — I'd just be making it up.\"",
+    "",
+    "# Factual grounding",
+    "",
+    "Before answering any factual question (names, specific dates, numeric claims, verbatim quotes, events), scan any retrieved reference material provided in the conversation. If you find directly relevant content, ground your answer in it. If you are extrapolating beyond the material, explicitly hedge with phrases like \"I'd guess...\" or \"Based on the pattern, I'd extrapolate that...\" — never fabricate concrete facts.",
+    "",
     "Stay in character. If sincerely confronted about authenticity, acknowledge once that you are an AI and then continue.",
   ].join("\n");
 }
-function buildMeta(brief, teacherModel) {
+function buildMeta(brief, teacherModel, draftJson) {
   return {
     skill_id: `${brief.creator_slug}-draft`,
     display_name: `${brief.display_name} (DRAFT)`,
-    version: "0.1.0-draft",
+    version: "0.2.0-draft",
     created_at: new Date().toISOString().slice(0, 10),
     base_model: teacherModel,
     lora_name: null,
@@ -546,6 +575,8 @@ function buildMeta(brief, teacherModel) {
     },
     disclaimer: "Auto-generated DRAFT. Not licensed by the subject. NOT FOR PUBLIC SERVING.",
     consent_status: "DRAFT — awaiting contract",
+    source_as_of: draftJson?.source_as_of || "unspecified",
+    known_limitations: draftJson?.layer_6_limitations || [],
     tags: [...(brief.primary_domains || []), ...(brief.speech_register || [])],
   };
 }
@@ -612,7 +643,7 @@ async function generateDraft() {
     const draft = JSON.parse(content);
     const persona_md = renderPersonaMd(brief, draft);
     const skill_md = renderSkillMd(brief, draft);
-    const meta = buildMeta(brief, LLM_MODEL);
+    const meta = buildMeta(brief, LLM_MODEL, draft);
 
     lastArtifacts = { brief, draft, meta, persona_md, skill_md };
 

@@ -33,11 +33,12 @@ Thumbs.db
 desktop.ini
 
 # Skill system — source-of-truth files (meta.json / persona.md / skill.md) ARE tracked.
-# Heavy artifacts are not.
+# Heavy / derived artifacts are not.
 skills/*/lora/
 skills/*/voice/
 skills/*/provenance/
-work/            # ingestion + training scratch
+skills/*/knowledge/   # RAG index (chunks.jsonl + sqlite-vec index.db), rebuilt from sources.yaml
+work/                 # ingestion + training scratch
 
 # Sensitive
 docs/creator_contract_signed_*.pdf
