@@ -115,6 +115,23 @@ def build_index(skill_dir: Path, chunks: list[Chunk], embed_model: str) -> dict:
 
 # ---------- call vLLM with guided_json ----------
 
+def _is_qwen(model_name: str) -> bool:
+    """chat_template_kwargs is Qwen3-specific; Grok and others reject or
+    ignore it. Gate on model name."""
+    return (model_name or "").lower().startswith("qwen")
+
+
+def _auth_headers() -> dict:
+    """Build headers for the upstream LLM call. Adds Bearer when
+    SKILL_TEACHER_API_KEY is set (Grok / OpenAI / any managed API).
+    When unset (self-hosted vLLM), no Authorization is sent."""
+    h = {"Content-Type": "application/json", "User-Agent": "skill-worker/1.0"}
+    key = os.environ.get("SKILL_TEACHER_API_KEY")
+    if key:
+        h["Authorization"] = f"Bearer {key}"
+    return h
+
+
 def call_draft(brief: CreatorBriefRich, context_block: str,
                vllm_base: str, teacher_model: str,
                timeout: float = 180.0) -> dict:
@@ -129,15 +146,17 @@ def call_draft(brief: CreatorBriefRich, context_block: str,
         "top_p": 0.9,
         "max_tokens": 3500,
         "stream": False,
-        "chat_template_kwargs": {"enable_thinking": False},
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": "DraftPersonaV2", "schema": schema, "strict": True},
         },
     }
+    if _is_qwen(teacher_model):
+        body["chat_template_kwargs"] = {"enable_thinking": False}
+
     r = httpx.post(f"{vllm_base.rstrip('/')}/chat/completions",
                    json=body, timeout=timeout,
-                   headers={"User-Agent": "skill-worker/1.0"})
+                   headers=_auth_headers())
     r.raise_for_status()
     content = r.json()["choices"][0]["message"]["content"]
     data = json.loads(content)
