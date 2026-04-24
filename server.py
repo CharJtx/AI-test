@@ -3598,33 +3598,72 @@ async def proxy_download_url(url: str = Query(...)):
     return StreamingResponse(stream_bytes(), media_type="application/octet-stream", headers=headers)
 
 
+_EXT_TO_MIME = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".mkv": "video/x-matroska",
+    ".ogg": "video/ogg",
+    ".ogv": "video/ogg",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+    ".opus": "audio/opus",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _guess_ct_from_url(url: str) -> str:
+    """根据 URL 路径扩展名推断 Content-Type，未知时返回空串。"""
+    from urllib.parse import urlparse
+    path = urlparse(url).path.lower()
+    for ext, mime in _EXT_TO_MIME.items():
+        if path.endswith(ext):
+            return mime
+    return ""
+
+
 @app.get("/api/playground/proxy-media")
 async def proxy_media_url(url: str = Query(...)):
     """代理内联播放远程 URL 资源，CORS-friendly。
-    区别于 /proxy-download：
-    - 保留上游 Content-Type（video/mp4, audio/mpeg 等）
-    - 不设 Content-Disposition（浏览器直接内联播放）
-    - 注入 Access-Control-Allow-Origin: *，允许客户端 canvas 读取像素
+    - 根据 URL 扩展名/上游响应头推断 Content-Type
+    - 注入 Access-Control-Allow-Origin: * 供 canvas 读取像素
     - 用于编辑器提取视频首帧作为规则网格背景
     """
     if not (url.startswith("http://") or url.startswith("https://")):
         return JSONResponse({"error": "invalid URL"}, status_code=400)
 
-    # 先用 HEAD/小范围 GET 获取上游 Content-Type
-    upstream_ct = "application/octet-stream"
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as probe:
-            head_resp = await probe.head(url)
-            if head_resp.status_code < 400:
-                ct = head_resp.headers.get("content-type", "")
-                if ct:
-                    upstream_ct = ct
-    except Exception:
-        # HEAD 不被支持时继续，流式请求会重新拿
-        pass
+    # 优先按扩展名推断（最可靠，不依赖 CDN HEAD 行为）
+    guessed_ct = _guess_ct_from_url(url)
+    upstream_ct = guessed_ct or "application/octet-stream"
+
+    # 如果扩展名推断不出，尝试 HEAD 探测（部分 CDN 要求 UA）
+    if not guessed_ct:
+        try:
+            async with httpx.AsyncClient(
+                timeout=15, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (muvee-proxy)"}
+            ) as probe:
+                head_resp = await probe.head(url)
+                if head_resp.status_code < 400:
+                    ct = head_resp.headers.get("content-type", "").split(";")[0].strip()
+                    if ct and ct != "application/octet-stream":
+                        upstream_ct = ct
+        except Exception:
+            pass
 
     async def stream_bytes():
-        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=None, follow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 (muvee-proxy)"}
+        ) as client:
             async with client.stream("GET", url) as resp:
                 async for chunk in resp.aiter_bytes(chunk_size=65536):
                     yield chunk
