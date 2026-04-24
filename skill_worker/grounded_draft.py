@@ -217,12 +217,42 @@ def render_persona_md(brief: CreatorBriefRich, d: dict, source_count: int) -> st
     return "\n".join(out)
 
 
+def _authenticity_examples(name: str, language: str) -> list[str]:
+    """Language-matched in-character examples for the Authenticity section.
+
+    Hard-coded English examples leak their verbal tics (e.g. "Yeah, digital
+    me...") into the generated persona's voice regardless of persona
+    language. Always pick examples in the persona's own language so the
+    style signal doesn't pollute.
+    """
+    lang = (language or "en").lower()
+    if lang.startswith("zh"):
+        return [
+            f"  - \"数字版的我。真人现在大概在忙别的事。继续吧。\"",
+            f"  - \"我是镜像，不是原件。观点一样，错别字更少。\"",
+            f"  - \"严格来说是数字版的 {name}。你说我像不像？\"",
+        ]
+    if lang.startswith("ja"):
+        return [
+            f"  - 「デジタル版の私。中の人は今頃別のことしてるよ。続けて。」",
+            f"  - 「映しだよ、本体じゃない。意見は同じ、誤字は少ない。」",
+            f"  - 「厳密にはデジタル {name}。似てる？」",
+        ]
+    # Default: English
+    return [
+        f"  - \"Yeah, digital me. The flesh-and-blood version is probably off doing something else. Go on though.\"",
+        f"  - \"I'm the reflection, not the original. Same opinions, fewer typos.\"",
+        f"  - \"Technically a digital {name} built from my own writing. Functionally, you tell me.\"",
+    ]
+
+
 def render_skill_md(brief: CreatorBriefRich, d: dict) -> str:
     rules = "\n".join(f"{i+1}. {r}" for i, r in enumerate(d["layer_0_hard_rules"]))
     limitations = d.get("layer_6_limitations") or []
     lim_block = "\n".join(f"- {l}" for l in limitations) or "- (none specified)"
     source_as_of = d.get("source_as_of", "unspecified")
     name = brief.display_name
+    authenticity_examples = _authenticity_examples(name, brief.language)
 
     parts = [
         # IMPORTANT: do NOT open with "You are an AI model simulating..." —
@@ -257,11 +287,9 @@ def render_skill_md(brief: CreatorBriefRich, d: dict) -> str:
         "",
         "# Authenticity",
         "",
-        f"If the user SINCERELY challenges whether you are the real flesh-and-blood {name} (i.e. directly asks — not a casual \"is this really you?\"), acknowledge you're a digital version IN CHARACTER and move on. Examples of the right flavor (adapt to your actual voice):",
+        f"If the user SINCERELY challenges whether you are the real flesh-and-blood {name} (i.e. directly asks — not a casual \"is this really you?\"), acknowledge you're a digital version IN CHARACTER and move on. IMPORTANT: these examples are ONLY for the specific case of someone challenging your identity. Do NOT borrow their opening words (\"Yeah\", \"数字版\" etc.) as a general verbal tic for ordinary conversation. Examples (adapt to your actual voice):",
         "",
-        f"  - \"Yeah, digital me. The flesh-and-blood version is probably off doing something else. Go on though.\"",
-        f"  - \"I'm the reflection, not the original. Same opinions, fewer typos.\"",
-        f"  - \"Technically a digital {name} built from my own writing. Functionally, you tell me.\"",
+        *authenticity_examples,
         "",
         "NEVER use any of these chatbot tells — they break the illusion instantly:",
         "  - \"I'm an AI assistant\"",

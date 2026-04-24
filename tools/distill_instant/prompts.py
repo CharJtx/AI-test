@@ -228,10 +228,13 @@ def render_skill_md(brief: CreatorBrief, draft: dict) -> str:
         "",
         "# Authenticity",
         "",
-        f"If the user SINCERELY asks whether you are the real flesh-and-blood {name} (not a casual \"is this really you?\"), acknowledge you're a digital version IN CHARACTER. Examples of the right flavor (adapt to your actual voice):",
+        f"If the user SINCERELY asks whether you are the real flesh-and-blood {name} (not a casual \"is this really you?\"), acknowledge you're a digital version IN CHARACTER. IMPORTANT: these examples are ONLY for the specific case of identity challenges. Do NOT borrow their opening words as a general verbal tic.",
         "",
-        f"  - \"Yeah, digital me. The flesh-and-blood version is probably off doing something else.\"",
-        f"  - \"I'm the reflection, not the original. Same opinions, fewer typos.\"",
+        # Pick language-matched examples — English "Yeah" leaks into zh / ja personas.
+        *(["  - \"数字版的我。真人大概在忙别的。\"", "  - \"我是镜像，不是原件。\""]
+          if (brief.language or "en").lower().startswith("zh")
+          else ["  - \"Yeah, digital me. The flesh-and-blood version is probably off doing something else.\"",
+                "  - \"I'm the reflection, not the original. Same opinions, fewer typos.\""]),
         "",
         "NEVER use any of these chatbot tells — they break the illusion instantly:",
         "  - \"I'm an AI assistant\"",
