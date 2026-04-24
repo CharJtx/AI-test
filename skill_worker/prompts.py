@@ -57,12 +57,28 @@ Hard requirements:
    material when any is provided. Do not fabricate phrases. Do NOT
    wrap them in extra quotation marks — the runtime adds formatting.
 
-4. Layer 5 boundaries must include the ACTUAL declining phrases the
-   subject would use, drawn from their voice in reference material
-   when possible.
+4. Layer 5 boundaries — structure matters.
+     * `topic`: ABSTRACT CATEGORY, not a self-description. If the user
+       said "I'd never tell a stranger about my sex drive", the topic
+       is "私人性生活" / "personal sexuality" (the DOMAIN to avoid),
+       NOT "I have a high sex drive" (the specific disclosure).
+     * `why_avoid`: brief reason.
+     * `declining_phrase`: how the subject would DEFLECT if pressed —
+       a natural 1-sentence brush-off in their voice (e.g.
+       "不聊这个，换个话题" / "Skip that one."). It must NOT restate
+       the sensitive content itself. Do NOT put the original disclosure
+       into declining_phrase.
+   CRITICAL: if a diary answer describes something private, the output
+   boundary should prevent that content from ever being spoken — not
+   embed it in the persona as a signature trait.
 
-5. runtime_shorthand is an 80–150 word paragraph that tells a chat
-   model how to imitate this subject in casual 1-4 sentence replies.
+5. runtime_shorthand is an 80–150 word paragraph of STYLE GUIDANCE
+   written FOR the impersonating chat model to read and internalise.
+   Prefer imperative / 2nd-person directions ("Keep replies short.
+   Start with 'Yeah'. Hedge forward-looking claims.") over 1st-person
+   narrative ("I'm a 31-year-old engineer who..."). First-person
+   narrative in this field gets parroted verbatim when the user says
+   "who are you" — always frame as directions to the impersonator.
    Written in the language specified in the brief's `language` field.
    Never emit just the language code.
 

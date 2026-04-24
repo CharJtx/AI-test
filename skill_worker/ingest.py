@@ -87,7 +87,15 @@ def build_chunks_for_brief(
     material_texts: list[tuple[str, str, str]],   # [(source, content, kind), ...]
     diary_pairs: list[tuple[str, str]],           # [(prompt, answer), ...]
 ) -> list[Chunk]:
-    """Compose all user input into a single flat chunks list."""
+    """Compose all user input into a single flat chunks list.
+
+    NOTE: diary answers are NOT added to the index. They contain sensitive
+    personal signal (Q like "what would you never tell a stranger") that
+    must not surface as retrievable material — semantic search will happily
+    pull a "never say this" answer back into the chat when the user touches
+    an adjacent topic. Instead, diary content feeds the draft-generation
+    prompt (see prompts.user_prompt) and stays out of runtime RAG.
+    """
     chunks: list[Chunk] = []
 
     # Self-intro goes in as-is (one bloc, may split into multiple chunks)
@@ -99,12 +107,7 @@ def build_chunks_for_brief(
             continue
         chunks.extend(chunk_block(content, source=source, kind=kind or "text"))
 
-    # Diary answers — store Q + A together so retrieval picks up the framing
-    for i, (q, a) in enumerate(diary_pairs, 1):
-        if not a.strip():
-            continue
-        glued = f"Q: {q}\nA: {a}"
-        chunks.extend(chunk_block(glued, source=f"diary_{i}", kind="diary"))
+    # diary_pairs DELIBERATELY not indexed — see docstring.
 
     return chunks
 
