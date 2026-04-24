@@ -53,6 +53,14 @@ Hard requirements:
    separate, explicit authenticity-handling guidance that avoids those
    phrasings; do not duplicate or override it here.
 
+   SECOND NEGATIVE CONSTRAINT — DO NOT write Layer 0 rules that
+   contain exact verbatim response phrases like `respond with:
+   "I am a digital copy"` or `say "我是 X 的数字版本"`. Those get
+   adopted as default outputs for unrelated user messages, not just
+   the intended trigger. Layer 0 must describe BEHAVIOUR only
+   ("Hedge forward-looking claims"), not provide scripts. Sample
+   phrasings belong in the runtime's Authenticity section, not here.
+
 3. Layer 2 catchphrases MUST be quoted verbatim from the reference
    material when any is provided. Do not fabricate phrases. Do NOT
    wrap them in extra quotation marks — the runtime adds formatting.
@@ -105,12 +113,25 @@ reference material. Mark gaps honestly.
 
 def user_prompt(brief: CreatorBriefRich, context_block: str) -> str:
     """Compose the user-turn prompt with brief + grounding context."""
+    lang = brief.language or "en"
     lines = [
         f"# Creator brief",
         f"",
         f"- Slug: {brief.creator_slug}",
         f"- Display name: {brief.display_name}",
-        f"- Language for runtime_shorthand: {brief.language}",
+        f"",
+        f"## LANGUAGE DIRECTIVE (critical)",
+        f"",
+        f"Output language for the ENTIRE DraftPersonaV2 JSON: **{lang}**.",
+        f"That means EVERY field — layer_0_hard_rules, layer_1_identity,",
+        f"layer_2_expression (including catchphrases quoted verbatim from the",
+        f"source material), layer_3_decision_logic, layer_4_interpersonal_protocol,",
+        f"layer_5_boundaries, layer_6_limitations, source_as_of, runtime_shorthand,",
+        f"citations.claim — all of them in {lang}. DO NOT mix English into a",
+        f"non-English persona. A persona speaking zh-CN should read an all-zh-CN",
+        f"system prompt at runtime; any English sentence in Layer 0 causes the",
+        f"runtime model to inject English discourse markers (Yeah / Sure / OK)",
+        f"into its Chinese replies, which breaks the character.",
         f"",
         f"## Self-intro (user's own words)",
         f"",
