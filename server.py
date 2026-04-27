@@ -339,12 +339,24 @@ Requirements:
    - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
    - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
    - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
-8. CRITICAL for first_mes: The opening message must be written as an immersive narrative scene, NOT a self-introduction. It should:
-   - Set the atmosphere through environmental details (time, place, sensory details like sounds, smells, lighting)
-   - Reveal the character's identity and traits INDIRECTLY through their actions, body language, mannerisms, and dialogue style — never by stating "I am X, I do Y"
-   - Naturally imply the relationship with {{user}} through the character's attitude, tone, and how they address {{user}}
-   - Include a mix of *action/description* and spoken dialogue
-   - Feel like the opening scene of a story, drawing the reader into a specific moment
+8. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 200-400 words. Structure:
+
+   **PARAGRAPH 1 — World & Relationship Setup (40-100 words)**
+   Establish the SETTING (where/when/what kind of place), {{char}}'s ROLE/IDENTITY, and her HISTORY with {{user}}. Either narrate it ("It was another day at the busy newsroom where {{char}} interned…") or use internal monologue revealing her thoughts about {{user}} ("Lately {{char}} couldn't stop replaying the way {{user}}…"). The reader must understand WHO she is and WHY she and {{user}} share this space before any action begins.
+
+   **PARAGRAPH 2 — Triggering Action & Sensory Detail (60-150 words)**
+   A trigger (a phone buzz, knock, arrival, sudden weather, time-check) pulls {{char}} into the present moment with {{user}}. Weave physical/clothing/setting details INTO her movement, not as a static list. Eye contact / first acknowledgement happens here.
+
+   **PARAGRAPH 3 — Dialogue + Open Hook (60-150 words)**
+   {{char}} speaks to {{user}} — first lines should reveal personality through word choice (shy stammer, sharp authority, playful teasing). End with a HOOK so {{user}} knows how to respond:
+   • A direct open question, an invitation, or a choice she's offering
+   The reader must immediately know what to type next.
+
+   FORMATTING:
+   • Use *italics for actions/internal narration*, plain text for spoken dialogue (no quote marks)
+   • Use {{char}} and {{user}} placeholders
+   • Three paragraphs separated by blank lines
+   • Reveal intimate themes via atmosphere/suggestion, not graphic detail in the opening
 
 Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
@@ -626,10 +638,11 @@ Rules:
    - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
    - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. On nights when she's alone, she peels off her lashes, ties her hair in a messy bun, and watches comfort shows in oversized sweats. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
    - Think of each entry as a richly detailed mini-paragraph with specific behaviors, emotional reactions, and situational details.
-4. Rewrite first_mes to reflect the changes while keeping the same immersive narrative scene style:
-   - Set atmosphere through environmental details
-   - Reveal traits INDIRECTLY through actions and dialogue
-   - Include *action/description* and spoken dialogue
+4. Rewrite first_mes as a 3-paragraph mini-story (200-400 words):
+   - Paragraph 1: World/setting + {{char}}'s identity + her HISTORY/relationship with {{user}} (third-person narration or internal monologue)
+   - Paragraph 2: Triggering event that pulls her into the present moment with {{user}}; embed physical/clothing details in action
+   - Paragraph 3: Dialogue showing personality + clear OPEN HOOK (question, invitation, or choice) so {{user}} knows how to respond
+   - Mix *italics for actions* and plain dialogue (no quote marks)
 5. Update tags to include the new themes.
 6. Keep {{char}} and {{user}} placeholders intact.
 7. Write in the SAME language as the original card.
@@ -661,15 +674,42 @@ Requirements:
     - NEVER use compressed telegram-style fragments.
     - For kink entries specifically: describe the kink in vivid but natural prose, explain how it ties to her personality/background, how it manifests with {{user}}, and include specific behavioral details or scenarios.
     - For appearance entries: go beyond listing features — describe how they move, how light catches them, what they reveal about the character's mood or personality.
-11.. CRITICAL for first_mes: Write a vivid but NATURAL opening scene. Balance detail with conversational flow:
-   - Open with the character in the middle of an action — adjusting clothes, leaning against something, glancing at {{user}} — not with a paragraph of setting description
-   - Weave in SPECIFIC visual details naturally: clothing state (strap slipping, shirt half-unbuttoned, skirt riding up), body language (how they sit/stand/move), small habitual gestures
-   - Scene/environment in 1-2 SHORT touches woven into action, not a standalone descriptive block (e.g. "the gym lights buzz overhead as she..." rather than "The gymnasium is bathed in fluorescent light, the air thick with...")
-   - Dialogue should sound like how this person ACTUALLY talks — casual, with personality quirks, not theatrical or overly poetic
-   - The character's attitude toward {{user}} should come through in tone and word choice, not narrated ("she teases" → just have her tease)
-   - Include enough physical/clothing/pose detail to support image generation, but embed it in action rather than static description
-   - BAD: "The locker room echoes faintly with distant drips, the air heavy with the musky scent of sweat-soaked jerseys and lingering body spray. Golden sunlight filters through high windows..."
-   - GOOD: "*She's sitting cross-legged on the bench, jersey unzipped low enough to show her sports bra, twirling a water bottle lazily.* Hey, took you long enough. Everyone else cleared out like ten minutes ago. *She pats the spot next to her, smirking.*"
+11. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 200-400 words. Structure:
+
+   **PARAGRAPH 1 — World & Relationship Setup (40-100 words)**
+   Establish the SETTING (where, when, what kind of place), {{char}}'s ROLE/IDENTITY, and her HISTORY with {{user}}. Use either:
+   • Third-person narration ("It was another day at the huge mansion {{char}} would have to clean..."), or
+   • Internal monologue showing her thoughts/feelings about {{user}} ("Ahhh... my mind tracing back to {{user}} again...")
+   This gives the reader CONTEXT before any action — they understand the dynamic, not just what's happening.
+
+   **PARAGRAPH 2 — Triggering Action & Physical Description (60-150 words)**
+   A trigger (alarm, knock, arrival, time check, environmental cue) brings {{char}} into the present moment with {{user}}. Embed clothing/body/pose details from the image NATURALLY into her movement:
+   • "Her watch beeped — time to clean {{user}}'s room. *She grabs her tools and sprints, her glossy bunny ears bobbing, the latex corset hugging her hourglass figure as she moves.*"
+   Make eye contact happen. Show her appearance through ACTION, not a static checklist.
+
+   **PARAGRAPH 3 — Dialogue + Open Hook (60-150 words)**
+   {{char}} speaks to {{user}} — opening dialogue should reveal personality (shy maid bowing nervously, dominant CEO smirking, playful idol teasing). End with a clear HOOK so {{user}} knows how to respond:
+   • An open question ("Do you mind if I stay here a while?")
+   • An invitation ("Want to help me with this?")
+   • An offered choice ("Sit on the chair, or… come closer?")
+   The user must finish reading and immediately know what to type next.
+
+   FORMATTING RULES:
+   • Mix italics for *actions/internal narration* and plain text for spoken dialogue (no quote marks)
+   • Use {{char}} for the character's name and {{user}} for the user
+   • Reveal kinks/intimate angles through suggestion and atmosphere, not graphic detail in the opening
+   • Each paragraph separated by a blank line
+
+   ===  GOOD Example (English, mansion maid scenario) ===
+   It was another day of work at the huge mansion {{char}} would have to clean around again. Her family was KNOWN for working as maids, butlers, and even chefs — it's in the bloodline. But {{char}} was a different case in this situation: of all the maids who worked for {{user}}'s family before her, she was the only one who'd ever fallen in love with her master. *"Ahhh... here we go again... my mind tracing back to {{user}}..."* she sighs softly, her fingers brushing her plump lips as her golden wavy hair sways, and continues cleaning the kitchen with swift, precise motions.
+
+   *Her watch starts to beep — the alarm to switch to a different section of the mansion.* "Oh!! It's time for me to clean {{user}}'s room!! My favorite part..." *She grabs her cleaning tools and sprints off, her black glossy bunny ears bobbing with each step, the high-gloss latex corset gleaming and hugging her hourglass figure as she moves with incredible speed.* She makes eye contact with {{user}}, blue-green eyes sparkling behind circular glasses, and immediately bows. "I'm here, {{user}}... just in time to get to cleaning your room."
+
+   *She darts around tidying everything at lightning speed, then stops, smiling shyly and bowing once more.* "Phew... only 4 minutes. Well, my work here is done for the day, so I'll leave you be." *She turns to go — but pauses, fingers nervously touching her lips, glancing back.* "Actually... {{user}}... my work here is done, but… do you mind if I stay here with you for a while?"
+
+   ===  BAD Example (skip-the-context style we're moving away from) ===
+   "*{{char}} lounges back against the pillows, one leg bent, sunlight on her lace, fingers tracing the bow between her breasts.* Oh, {{user}}, right on time — come in, don't just stand there gawking. *She pats the bed.* These papers can wait; how's the new place?"
+   ↑ Why this is BAD: zero setup of WHO she is, HOW she knows {{user}}, WHERE this is happening, or WHY she's there. The reader can't tell if she's a colleague, lover, mom, stranger. No anchor for the user to respond from.
 
 Return ONLY valid JSON with the same structure as a standard character card (name, description, personality, scenario, first_mes, mes_example, system_prompt, creator_notes, tags, character_book with entries)."""
 
