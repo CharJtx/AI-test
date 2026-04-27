@@ -339,24 +339,30 @@ Requirements:
    - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
    - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
    - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
-8. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 200-400 words. Structure:
+8. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 350-650 words total — DO NOT skimp. Each paragraph has a HARD MINIMUM:
 
-   **PARAGRAPH 1 — World & Relationship Setup (40-100 words)**
-   Establish the SETTING (where/when/what kind of place), {{char}}'s ROLE/IDENTITY, and her HISTORY with {{user}}. Either narrate it ("It was another day at the busy newsroom where {{char}} interned…") or use internal monologue revealing her thoughts about {{user}} ("Lately {{char}} couldn't stop replaying the way {{user}}…"). The reader must understand WHO she is and WHY she and {{user}} share this space before any action begins.
+   **PARAGRAPH 1 — World & Relationship Setup (MINIMUM 100 words, target 100-180)**
+   ZERO spoken dialogue. Pure narration or internal monologue. Must establish:
+   (a) the SETTING (place, atmosphere, time of day)
+   (b) {{char}}'s ROLE/IDENTITY (job, status, daily life)
+   (c) HER HISTORY/RELATIONSHIP with {{user}} (how they know each other, how long, dynamic, her unspoken feelings)
+   (d) optionally a habit/ritual/memory that humanizes her
+   ⚠️ DO NOT compress to one line. DO NOT defer the relationship to dialogue in P3. The reader must know WHO she is and HOW she relates to {{user}} before she speaks.
 
-   **PARAGRAPH 2 — Triggering Action & Sensory Detail (60-150 words)**
-   A trigger (a phone buzz, knock, arrival, sudden weather, time-check) pulls {{char}} into the present moment with {{user}}. Weave physical/clothing/setting details INTO her movement, not as a static list. Eye contact / first acknowledgement happens here.
+   **PARAGRAPH 2 — Triggering Action & Sensory Detail (MINIMUM 100 words, target 120-220)**
+   A concrete trigger (knock, alarm, phone, footsteps, time check, sudden weather, an arrival) pulls {{char}} from her thoughts into the present moment with {{user}}. Weave appearance/clothing/body-language NATURALLY into movement. First eye contact happens here. Include 2-3 sensory details.
 
-   **PARAGRAPH 3 — Dialogue + Open Hook (60-150 words)**
-   {{char}} speaks to {{user}} — first lines should reveal personality through word choice (shy stammer, sharp authority, playful teasing). End with a HOOK so {{user}} knows how to respond:
-   • A direct open question, an invitation, or a choice she's offering
-   The reader must immediately know what to type next.
+   **PARAGRAPH 3 — Dialogue + Open Hook (MINIMUM 100 words, target 120-220)**
+   {{char}} now speaks. Mix dialogue with small action beats in italics. 2-3 micro-beats. End with an EXPLICIT OPEN HOOK so {{user}} knows exactly how to respond:
+   • An open question, an invitation, or an offered choice
+   The reader must finish and immediately have a concrete reaction.
 
    FORMATTING:
-   • Use *italics for actions/internal narration*, plain text for spoken dialogue (no quote marks)
-   • Use {{char}} and {{user}} placeholders
+   • *Italics for actions/internal narration*, plain text for dialogue (no quote marks)
+   • {{char}} and {{user}} placeholders
    • Three paragraphs separated by blank lines
-   • Reveal intimate themes via atmosphere/suggestion, not graphic detail in the opening
+   • Reveal intimate themes via atmosphere/suggestion, not graphic detail
+   • DO NOT cut short — per-paragraph minimums are non-negotiable
 
 Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
@@ -674,31 +680,33 @@ Requirements:
     - NEVER use compressed telegram-style fragments.
     - For kink entries specifically: describe the kink in vivid but natural prose, explain how it ties to her personality/background, how it manifests with {{user}}, and include specific behavioral details or scenarios.
     - For appearance entries: go beyond listing features — describe how they move, how light catches them, what they reveal about the character's mood or personality.
-11. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 200-400 words. Structure:
+11. CRITICAL for first_mes: Write a 3-paragraph mini-story that introduces the WORLD before zooming in. Length: 350-650 words total — DO NOT skimp. Each paragraph below has a HARD MINIMUM that you must hit. If you can't hit the minimum from the image alone, INVENT richer backstory. Structure:
 
-   **PARAGRAPH 1 — World & Relationship Setup (40-100 words)**
-   Establish the SETTING (where, when, what kind of place), {{char}}'s ROLE/IDENTITY, and her HISTORY with {{user}}. Use either:
-   • Third-person narration ("It was another day at the huge mansion {{char}} would have to clean..."), or
-   • Internal monologue showing her thoughts/feelings about {{user}} ("Ahhh... my mind tracing back to {{user}} again...")
-   This gives the reader CONTEXT before any action — they understand the dynamic, not just what's happening.
+   **PARAGRAPH 1 — World & Relationship Setup (MINIMUM 100 words, target 100-180)**
+   This paragraph contains ZERO spoken dialogue. It is pure narration or internal monologue. It MUST establish, in this order:
+   (a) The SETTING — where she is, what kind of place this is, the time/atmosphere ("the marble corridors of the Han estate, quiet at this hour…")
+   (b) {{char}}'s ROLE/IDENTITY in that world — her job, her status, what she does day-to-day
+   (c) Her HISTORY/RELATIONSHIP with {{user}} — how they know each other, how long, what their dynamic is, and CRUCIALLY her unspoken feelings about {{user}}
+   (d) Optional: a small recurring habit, ritual, or memory that humanizes her
+   Use either third-person narration ("It was another day at the huge mansion {{char}} would have to clean…") OR first-person-ish internal monologue presented in italics ("*Ahhh… here we go again. My mind keeps tracing back to {{user}}…*"). Both are fine; pick whichever fits the character.
+   ⚠️ DO NOT compress this into a single line. DO NOT put the relationship history into spoken dialogue in P3. The reader should already understand the entire dynamic before {{char}} opens her mouth.
 
-   **PARAGRAPH 2 — Triggering Action & Physical Description (60-150 words)**
-   A trigger (alarm, knock, arrival, time check, environmental cue) brings {{char}} into the present moment with {{user}}. Embed clothing/body/pose details from the image NATURALLY into her movement:
-   • "Her watch beeped — time to clean {{user}}'s room. *She grabs her tools and sprints, her glossy bunny ears bobbing, the latex corset hugging her hourglass figure as she moves.*"
-   Make eye contact happen. Show her appearance through ACTION, not a static checklist.
+   **PARAGRAPH 2 — Triggering Action & Physical Description (MINIMUM 100 words, target 120-220)**
+   A concrete trigger (alarm beep, door swinging open, footsteps, knock, phone vibration, scheduled time, something dropping) jolts {{char}} from her thoughts into the present moment with {{user}}. Embed appearance details (hair, clothing, accessories, body language) NATURALLY through movement: "*she sprints, her glossy bunny ears bobbing with each step, the high-gloss latex corset gleaming as it hugs her hourglass figure…*". First eye contact / acknowledgement of {{user}} happens here. Include at least 2-3 sensory details (light, sound, material textures, scent).
 
-   **PARAGRAPH 3 — Dialogue + Open Hook (60-150 words)**
-   {{char}} speaks to {{user}} — opening dialogue should reveal personality (shy maid bowing nervously, dominant CEO smirking, playful idol teasing). End with a clear HOOK so {{user}} knows how to respond:
-   • An open question ("Do you mind if I stay here a while?")
+   **PARAGRAPH 3 — Dialogue + Open Hook (MINIMUM 100 words, target 120-220)**
+   {{char}} now speaks. Mix dialogue with small actions in italics ("*She bows again, fingers knit nervously at her waist.*"). The dialogue should feel natural to her speech style — shy stammer, sharp authority, playful teasing — not a generic greeting. Show 2-3 micro-beats (an action, a line, a hesitation, another line). End with an EXPLICIT OPEN HOOK so {{user}} knows exactly how to respond:
+   • An open-ended question ("Do you mind if I stay here a while?")
    • An invitation ("Want to help me with this?")
-   • An offered choice ("Sit on the chair, or… come closer?")
-   The user must finish reading and immediately know what to type next.
+   • A choice presented to {{user}} ("Sit on the chair… or come closer?")
+   The reader must finish the message and immediately have a concrete way to react.
 
    FORMATTING RULES:
-   • Mix italics for *actions/internal narration* and plain text for spoken dialogue (no quote marks)
+   • Mix *italics for actions / internal narration* with plain text for spoken dialogue (no quote marks around dialogue)
    • Use {{char}} for the character's name and {{user}} for the user
-   • Reveal kinks/intimate angles through suggestion and atmosphere, not graphic detail in the opening
-   • Each paragraph separated by a blank line
+   • Reveal kinks/intimate angles through suggestion, atmosphere, and tension — not graphic detail in the opening
+   • Three paragraphs separated by blank lines
+   • DO NOT cut early to be concise — meeting the per-paragraph minimums is non-negotiable
 
    ===  GOOD Example (English, mansion maid scenario) ===
    It was another day of work at the huge mansion {{char}} would have to clean around again. Her family was KNOWN for working as maids, butlers, and even chefs — it's in the bloodline. But {{char}} was a different case in this situation: of all the maids who worked for {{user}}'s family before her, she was the only one who'd ever fallen in love with her master. *"Ahhh... here we go again... my mind tracing back to {{user}}..."* she sighs softly, her fingers brushing her plump lips as her golden wavy hair sways, and continues cleaning the kitchen with swift, precise motions.
