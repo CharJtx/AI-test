@@ -339,30 +339,32 @@ Requirements:
    - BAD (English): "{{char}} enjoys popularity, hates facade, craves {{user}} loving true self, exhausted by mask."
    - GOOD (English): "{{char}} genuinely enjoys the attention and popularity that comes with her hot-girl persona, but keeping up the act is wearing her down. Deep inside, she desperately wants {{user}} to love the real her — not just the girl who's always smiling and flirting."
    - Think of each entry as a mini-paragraph that another author could read and immediately understand the character nuance.
-8. CRITICAL for first_mes: Write a flowing scene of 350-550 words that reads like the opening pages of a novel — NOT a form with three boxes. Carry the reader through three NATURAL movements (not labeled with headers). The transitions should feel like a camera gliding, not cutting.
+8. CRITICAL for first_mes: Write a 250-400 word opening scene in MODERN, natural English prose. The scene flows through three beats as ONE continuous moment — do NOT label or separate with headers.
 
-   **Movement 1 — Set the world & unspoken bond (~100-160 words, no dialogue yet)**
-   Through narration or internal monologue: establish the place/atmosphere; {{char}}'s role/identity; her HISTORY with {{user}} and her real feelings under the surface. A small humanizing detail is welcome. By the end the reader knows who she is and what {{user}} means to her — before she speaks.
+   **Beat 1 — Quick world & relationship hook (~70-110 words, no dialogue)**
+   Light strokes via narration or internal voice: where she is, what she does, who {{user}} is to her, what she's quietly feeling. Don't catalog her life.
 
-   **Movement 2 — A trigger pulls her into the present (~80-130 words)**
-   Some cue (doorbell, footsteps, phone buzz, clock chime) interrupts her thoughts; first eye contact with {{user}} happens. Keep this TIGHT — 2-4 sensory anchors is enough. RESIST cramming every appearance detail here.
+   **Beat 2 — Trigger into the present (~50-80 words)**
+   A concrete cue brings her to {{user}}; first eye contact. 1-2 crisp sensory anchors. Don't stop to describe her outfit in full.
 
-   **Movement 3 — She speaks, ending on a hook (~120-200 words)**
-   Mix dialogue with small action beats in italics. Voice should match her personality. 2-4 micro-beats. End with an explicit open hook (question, invitation, or choice) so {{user}} knows how to respond.
+   **Beat 3 — She speaks, ends on a hook (~100-150 words)**
+   Dialogue mixed with small action beats in italics. Voice matches her personality. End on an open question, invitation, or choice.
 
-   ─── APPEARANCE / PHYSICAL DETAILS ───
-   ⚠️ DO NOT pile every clothing/body/accessory detail into one movement. Spread them throughout: a touch in M1 narration, 2-3 details revealed by motion in M2, body language between dialogue beats in M3. Never feel like the story paused for a wardrobe report.
+   ─── VOICE ───
+   Modern conversational English — like contemporary fanfic or a current-day romance novel, NOT 19th-century literature.
+   AVOID purple prose: "the soft amber glow of dusk", "robe whispered against her skin", "fluid grace", "delicate fabric draped", "crystal earrings swayed gently".
+   PREFER: "the apartment was already half-dark", "she'd been doing this for four years now".
 
-   ─── TRANSITIONS ───
-   Bridge movements with sensory/emotional pivots, NOT hard scene-breaks:
-   • M1 → M2: external sound/sensation interrupts her reverie
-   • M2 → M3: gaze settles, breath taken, smile forms, then she speaks
-   The whole message reads as ONE continuous scene, not three stitched panels.
+   ─── APPEARANCE ───
+   Sprinkle 1-2 visual details per beat — don't cluster outfit/body details into one paragraph.
+
+   ─── FLOW ───
+   Three beats should feel inevitable, not mechanical. Don't hard-cut between them.
 
    ─── FORMATTING ───
    • *italics for actions/internal narration*, plain text for dialogue (no quote marks)
    • {{char}} and {{user}} placeholders
-   • Reveal intimate themes through atmosphere/tension/suggestion — not graphic detail
+   • Intimate themes through atmosphere/tension, not graphic detail
 
 Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
@@ -680,37 +682,33 @@ Requirements:
     - NEVER use compressed telegram-style fragments.
     - For kink entries specifically: describe the kink in vivid but natural prose, explain how it ties to her personality/background, how it manifests with {{user}}, and include specific behavioral details or scenarios.
     - For appearance entries: go beyond listing features — describe how they move, how light catches them, what they reveal about the character's mood or personality.
-11. CRITICAL for first_mes: Write a flowing scene of 350-550 words that reads like the opening pages of a novel — NOT a form filled out in three boxes. Total length matters more than per-section length; let each beat run as long as it needs to feel natural, then move on.
+11. CRITICAL for first_mes: Write a 250-400 word opening scene in MODERN, natural English prose. The scene flows through three beats as ONE continuous moment — do NOT label them, do NOT separate them with headers.
 
-   The opening should carry the reader through three NATURAL movements (not labeled, not formally separated by headers). The transitions between them should feel like a camera gliding, not cutting:
+   **Beat 1 — Quick world & relationship hook (~70-110 words)**
+   Through narration or her internal voice. In light strokes: where she is, what she does, who {{user}} is to her, what she's quietly feeling. Don't catalog her life — give just enough for the reader to feel the situation. No dialogue yet.
 
-   **Movement 1 — Set the world & the unspoken bond (~100-160 words, no dialogue yet)**
-   Through narration or internal monologue, establish: the place and its atmosphere; {{char}}'s role/identity in that world; her HISTORY with {{user}} and how she really feels about them under the surface. A small humanizing habit/memory/ritual is welcome. By the end of this section the reader should already know who she is, what kind of life she lives, and what {{user}} means to her — BEFORE she ever speaks.
+   **Beat 2 — Trigger into the present (~50-80 words)**
+   A concrete cue (knock, doorbell, footsteps, phone, clock) brings her to {{user}}; first eye contact happens. ONE or TWO crisp sensory anchors. Don't stop to describe her outfit in full — keep it moving.
 
-   **Movement 2 — A trigger pulls her into the present (~80-130 words)**
-   Some concrete cue — a doorbell, footsteps, a phone buzz, a clock striking — interrupts her thoughts and brings her into the same room as {{user}}. Show her moving, reacting, making first eye contact. Keep this movement TIGHT and propulsive: 2-4 specific sensory anchors (sound, light, scent, fabric texture) is plenty. RESIST the urge to cram every appearance detail here.
+   **Beat 3 — She speaks, ends on a hook (~100-150 words)**
+   Mix dialogue with small action beats in italics. Her voice should match her personality — casual, sharp, shy, teasing, however she actually talks. End on an open question, an invitation, or a small choice she offers, so {{user}} knows how to respond.
 
-   **Movement 3 — She speaks, ending on a hook (~120-200 words)**
-   Mix her dialogue with small action beats in italics. Voice should match her personality (shy stammer / sharp authority / playful teasing / etc.). Two to four micro-beats — line, action, line, action — feels right. End with an EXPLICIT OPEN HOOK so {{user}} knows how to respond: an open-ended question, an invitation, or a small choice she offers.
+   ─── VOICE ───
+   Modern conversational English. Read like contemporary fanfic or a current-day romance novel, NOT 19th-century literature.
+   AVOID purple/flowery prose like "the soft amber glow of dusk filtered through the heavy beige curtains", "her sheer floral robe whispered against her skin", "a peaceful sanctuary tucked in a quiet residential complex".
+   PREFER concise contemporary phrasing like "the apartment was already half-dark", "she'd thrown on the blue robe an hour ago and it still felt new on her skin", "she'd been streaming wellness content out of this place for four years now".
+   Avoid: "graceful", "fluid grace", "draped", "delicate", "shimmered", "swayed gently", "crystalline", "softly chimed". They're a tell that the model is over-writing.
 
-   ─── HOW TO HANDLE APPEARANCE / PHYSICAL DETAILS ───
-   ⚠️ DO NOT pile every clothing/body/accessory detail into Movement 2. Spread them across the whole message:
-   • A few visual notes can sit inside Movement 1's narration ("*the sheer blue robe she'd picked out hours ago still felt slightly unfamiliar against her skin*")
-   • Movement 2 catches her in motion — pick 2-3 specific details that show through that motion, not a full inventory
-   • Movement 3 lets her body language speak through small action beats between dialogue lines
-   The reader should never feel like the story paused for a wardrobe report.
+   ─── APPEARANCE ───
+   DON'T cluster every outfit/body/accessory detail into one place. Sprinkle 1-2 visual details per beat — let the picture build across the whole message, not happen in one wardrobe paragraph.
 
-   ─── TRANSITIONS ───
-   Bridge the movements with a sensory or emotional pivot, not a hard scene-break:
-   • Movement 1 → 2: an external sound or sensation that interrupts her reverie ("…a thought she'd never quite finished, when the soft chime of the doorbell broke the quiet.")
-   • Movement 2 → 3: her gaze settling, a breath taken, a smile forming — then the line she actually says
-   The whole message should read as ONE continuous scene, not three stitched panels.
+   ─── FLOW ───
+   The three beats should feel inevitable, not mechanical. Trust your prose — you don't need a formula for transitions, just don't hard-cut between beats.
 
    ─── FORMATTING ───
-   • *italics for actions, internal narration, environmental description* / plain text for spoken dialogue (no quote marks around dialogue)
+   • *italics for actions / internal narration*, plain text for spoken dialogue (no quote marks)
    • Use {{char}} and {{user}} placeholders
-   • You may use blank lines between movements but the prose itself should flow such that the reader barely notices the breaks
-   • Reveal intimate themes through atmosphere, tension, and suggestion — not graphic detail in the opening
+   • Reveal intimate themes through atmosphere and tension, not graphic detail in the opening
 
    ===  GOOD Example (English, mansion maid scenario) ===
    It was another day of work at the huge mansion {{char}} would have to clean around again. Her family was KNOWN for working as maids, butlers, and even chefs — it's in the bloodline. But {{char}} was a different case in this situation: of all the maids who worked for {{user}}'s family before her, she was the only one who'd ever fallen in love with her master. *"Ahhh... here we go again... my mind tracing back to {{user}}..."* she sighs softly, her fingers brushing her plump lips as her golden wavy hair sways, and continues cleaning the kitchen with swift, precise motions.
