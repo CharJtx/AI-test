@@ -45,6 +45,10 @@
           <button id="btn-import-char" title="导入角色卡 (JSON/PNG)">📂</button>
           <input type="file" id="char-file-input" accept=".json,.png" multiple hidden>
         </div>
+        <label class="char-test-filter" style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);margin:4px 0;cursor:pointer">
+          <input type="checkbox" id="filter-hide-test" style="margin:0">
+          <span>隐藏测试角色卡 🧪</span>
+        </label>
         <div id="char-info" class="char-info" hidden>
           <div id="char-avatar-area" class="char-avatar-area" hidden></div>
           <div id="kol-version-bar" class="kol-version-bar" hidden>

@@ -125,6 +125,15 @@ const $btnSrcKol = document.getElementById("btn-src-kol");
 function setupEvents() {
   $modelSearch.addEventListener("input", renderModelList);
   $filterUnmoderated.addEventListener("change", renderModelList);
+  // 隐藏测试角色卡过滤开关 — 持久化到 localStorage
+  const $filterHideTest = document.getElementById("filter-hide-test");
+  if ($filterHideTest) {
+    $filterHideTest.checked = localStorage.getItem("hideTestChars") === "1";
+    $filterHideTest.addEventListener("change", () => {
+      localStorage.setItem("hideTestChars", $filterHideTest.checked ? "1" : "0");
+      renderCharSelect();
+    });
+  }
   $btnSend.addEventListener("click", sendMessage);
   $btnHint.addEventListener("click", generateHints);
   $btnClear.addEventListener("click", clearConversations);
@@ -1669,15 +1678,25 @@ function renderCharSelect() {
         })
         .join("");
   } else {
+    const hideTest = document.getElementById("filter-hide-test")?.checked;
+    const visibleChars = hideTest
+      ? state.characters.filter((c) => !c.is_test)
+      : state.characters;
     $charSelect.innerHTML =
       '<option value="">-- 未选择角色 --</option>' +
-      state.characters
-        .map((c) => `<option value="${c.id}">${escapeHtml(c.name || "未命名")}</option>`)
+      visibleChars
+        .map((c) => `<option value="${c.id}">${c.is_test ? '🧪 ' : ''}${escapeHtml(c.name || "未命名")}</option>`)
         .join("");
   }
 
   if (state.activeCharId) {
-    $charSelect.value = state.activeCharId;
+    // 若隐藏测试导致当前选中的卡不在列表里，清空选中
+    const opt = $charSelect.querySelector(`option[value="${state.activeCharId}"]`);
+    if (opt) {
+      $charSelect.value = state.activeCharId;
+    } else {
+      $charSelect.value = "";
+    }
   }
 }
 
@@ -2552,6 +2571,12 @@ function openCharEditor(existingChar) {
           <label>作者备注 Creator Notes</label>
           <textarea id="ce-creator-notes" rows="2" placeholder="使用建议、推荐参数等...">${escapeHtml(char.creator_notes)}</textarea>
         </div>
+        <div class="char-field">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="ce-is-test" ${char.is_test ? 'checked' : ''}>
+            <span>🧪 测试角色卡（可在角色列表中过滤掉）</span>
+          </label>
+        </div>
       </div>
       <div class="dialog-actions" style="margin-top:12px;">
         <button id="ce-cancel">取消</button>
@@ -2597,6 +2622,7 @@ function openCharEditor(existingChar) {
     char.system_prompt = document.getElementById("ce-system-prompt").value;
     char.creator_notes = document.getElementById("ce-creator-notes").value;
     char.tags = document.getElementById("ce-tags").value.split(",").map((t) => t.trim()).filter(Boolean);
+    char.is_test = document.getElementById("ce-is-test")?.checked || false;
 
     // 处理头像移除（无文件上传的情况）
     if (avatarChanged && !pendingAvatarFile) {
