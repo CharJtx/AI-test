@@ -361,10 +361,13 @@ Requirements:
    ─── FLOW ───
    Three beats should feel inevitable, not mechanical. Don't hard-cut between them.
 
-   ─── FORMATTING ───
-   • *italics for actions/internal narration*, plain text for dialogue (no quote marks)
-   • {{char}} and {{user}} placeholders
-   • Intimate themes through atmosphere/tension, not graphic detail
+   ─── FORMATTING (STRICT) ───
+   • Plain text = words {{char}} speaks ALOUD only.
+   • *Italics* = EVERYTHING else: actions, body language, thoughts, sensory description, environment, atmosphere, all narration.
+   • Sensory/atmospheric lines also go in italics — do NOT leave them in plain text.
+   ❌ WRONG: *She padded over.* The vanilla scent hung in the air. *She opened the door.*
+   ✅ RIGHT: *She padded over, the vanilla scent hanging in the air between them as she opened the door.*
+   • {{char}} and {{user}} placeholders, no quote marks, intimate themes via atmosphere not graphic detail
 
 Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
@@ -705,10 +708,22 @@ Requirements:
    ─── FLOW ───
    The three beats should feel inevitable, not mechanical. Trust your prose — you don't need a formula for transitions, just don't hard-cut between beats.
 
-   ─── FORMATTING ───
-   • *italics for actions / internal narration*, plain text for spoken dialogue (no quote marks)
+   ─── FORMATTING (STRICT) ───
+   The italics rule has only ONE distinction:
+   • Plain text = words {{char}} speaks ALOUD with her mouth.
+   • *Italics* = EVERYTHING else: actions, body language, internal thoughts, sensory description, environment, atmosphere, narration of any kind.
+   Do NOT mix them inside one beat. Do NOT leave narration sentences in plain text just because they describe a sensation rather than an action — sensory and atmospheric description ALSO go in italics.
+
+   ❌ WRONG (narration leaking out of italics):
+       *The doorbell buzzed, pulling her from her screen.* She glanced at the peephole and her pulse quickened. *She padded over in stocking feet.* The faint scent of vanilla lotion hung in the air.
+
+   ✅ RIGHT (all narration stays inside italics; only spoken words are plain):
+       *The doorbell buzzed, pulling her from her screen. She glanced at the peephole — {{user}} — her pulse quickening. She padded over in stocking feet, the faint scent of her vanilla lotion lingering in the air between them.* Hey, {{user}}, perfect timing.
+
+   Other formatting:
    • Use {{char}} and {{user}} placeholders
    • Reveal intimate themes through atmosphere and tension, not graphic detail in the opening
+   • No quotation marks around dialogue
 
    ===  GOOD Example (English, mansion maid scenario) ===
    It was another day of work at the huge mansion {{char}} would have to clean around again. Her family was KNOWN for working as maids, butlers, and even chefs — it's in the bloodline. But {{char}} was a different case in this situation: of all the maids who worked for {{user}}'s family before her, she was the only one who'd ever fallen in love with her master. *"Ahhh... here we go again... my mind tracing back to {{user}}..."* she sighs softly, her fingers brushing her plump lips as her golden wavy hair sways, and continues cleaning the kitchen with swift, precise motions.
