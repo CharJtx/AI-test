@@ -861,7 +861,7 @@ async def remix_character(request: Request):
     body = await request.json()
     original = body.get("original", {})
     instructions = body.get("instructions", "")
-    model = body.get("model", "x-ai/grok-4.1-fast")
+    model = body.get("model", "x-ai/grok-4.3")
 
     if not instructions.strip():
         return JSONResponse({"error": "instructions is required"}, status_code=400)
@@ -976,7 +976,7 @@ async def _generate_tagline(name: str, description: str, personality: str, scena
             resp = await client.post(
                 f"{OPENROUTER_BASE}/chat/completions",
                 json={
-                    "model": "x-ai/grok-4.1-fast",
+                    "model": "x-ai/grok-4.3",
                     "messages": [
                         {"role": "system", "content": TAGLINE_SYSTEM},
                         {"role": "user", "content": text},
@@ -1035,7 +1035,7 @@ Rules:
 6. STRICT CONTENT POLICY: NEVER include exposed genitalia, nipples, or full nudity. Use clothing, angles, fabric, or shadows to keep it tasteful."""
 
 
-async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
+async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.3") -> str | None:
     """Generate a portrait prompt from a character description. Returns None on failure.
 
     根据角色的文字描述生成图像生成提示词，用于后续调用图像生成 API 创建头像。
@@ -1069,7 +1069,7 @@ async def _generate_avatar_prompt(description: str, model: str = "x-ai/grok-4.1-
         return None
 
 
-async def _remix_avatar_prompt(original_prompt: str, instructions: str, model: str = "x-ai/grok-4.1-fast") -> str | None:
+async def _remix_avatar_prompt(original_prompt: str, instructions: str, model: str = "x-ai/grok-4.3") -> str | None:
     """Modify an existing avatar prompt based on remix instructions. Returns None on failure.
 
     根据混搭修改指令改写已有的头像提示词，使头像与角色变化保持一致。
@@ -1134,7 +1134,7 @@ async def generate_image_prompt(request: Request):
     """
     body = await request.json()
     text = body.get("text", "")
-    model = body.get("model", "x-ai/grok-4.1-fast")
+    model = body.get("model", "x-ai/grok-4.3")
 
     if not text.strip():
         return JSONResponse({"error": "text is required"}, status_code=400)
@@ -3024,7 +3024,7 @@ Return ONLY the updated full description text, no explanation, no labels, no mar
 
 
 @app.post("/api/characters/{char_id}/outfit")
-async def update_character_outfit(char_id: int, image: UploadFile = File(...), model: str = Form("x-ai/grok-4.1-fast")):
+async def update_character_outfit(char_id: int, image: UploadFile = File(...), model: str = Form("x-ai/grok-4.3")):
     """通过上传图片识别角色当前服装，并智能更新到角色卡 description 字段。"""
     chars = load_characters()
     char = next((c for c in chars if c["id"] == char_id), None)
@@ -3199,7 +3199,7 @@ Return ONLY the description text, no labels or quotes."""
 async def auto_tag_gallery(char_id: int, request: Request):
     """用多模态 LLM 为图库中未标注的图片批量生成描述。"""
     body = await request.json()
-    model = body.get("model", "x-ai/grok-4.1-fast")
+    model = body.get("model", "x-ai/grok-4.3")
     image_ids = body.get("image_ids", [])  # 空 = 全部未标注的
 
     images = _load_gallery(char_id)
@@ -3900,7 +3900,7 @@ async def generate_kol_character(request: Request):
     outfit_code = body.get("outfit_code", "")
     image_url = body.get("image_url", "")
     extra = body.get("extra", "")
-    model = body.get("model", "x-ai/grok-4.1-fast")
+    model = body.get("model", "x-ai/grok-4.3")
     kol_name = body.get("kol_name", "")
 
     if not profile_id or not image_url:
@@ -4025,7 +4025,7 @@ async def revise_kol_character(request: Request):
     body = await request.json()
     key = body.get("key", "")
     instructions = body.get("instructions", "")
-    model = body.get("model", "x-ai/grok-4.1-fast")
+    model = body.get("model", "x-ai/grok-4.3")
 
     if not key or not instructions:
         return JSONResponse({"error": "key and instructions required"}, status_code=400)
